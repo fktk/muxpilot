@@ -1,0 +1,193 @@
+"""Tests for the Textual App — integration tests using App.run_test()."""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from muxpilot.models import PaneStatus
+from muxpilot.app import MuxpilotApp
+from muxpilot.widgets.tree_view import TmuxTreeView
+
+from conftest import make_mock_client, make_pane, make_session, make_tree, make_window
+
+
+def _patched_app(tree=None, current_pane_id=None):
+    """Create a MuxpilotApp with a mocked TmuxClient/Watcher."""
+    mock_client = make_mock_client(tree=tree, current_pane_id=current_pane_id)
+    app = MuxpilotApp()
+    app._client = mock_client
+    from muxpilot.watcher import TmuxWatcher
+    app._watcher = TmuxWatcher(mock_client)
+    return app
+
+
+# ============================================================================
+# App startup
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_app_launches():
+    """App should mount all required widgets without errors."""
+    from textual.widgets import Input
+    app = _patched_app()
+    async with app.run_test():
+        assert app.query_one("#tmux-tree", TmuxTreeView) is not None
+        assert app.query_one("#detail-panel") is not None
+        assert app.query_one("#status-bar") is not None
+        assert app.query_one("#filter-input", Input) is not None
+
+
+@pytest.mark.asyncio
+async def test_tree_populated_on_mount():
+    """Tree should be populated with session/window/pane data on mount."""
+    tree = make_tree(sessions=[
+        make_session(session_name="test-sess", windows=[
+            make_window(window_name="test-win", panes=[make_pane(pane_id="%0")])
+        ])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test():
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        assert len(tw._pane_map) > 0
+
+
+# ============================================================================
+# Navigation
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_navigate_self_shows_warning():
+    """Activating the muxpilot's own pane should NOT call navigate_to."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%5")])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%5")
+    async with app.run_test():
+        msg = TmuxTreeView.PaneActivated(pane_id="%5")
+        app.on_tmux_tree_view_pane_activated(msg)
+        app._client.navigate_to.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_navigate_to_pane():
+    """Activating a different pane should call navigate_to with that pane ID."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%99")
+    async with app.run_test():
+        msg = TmuxTreeView.PaneActivated(pane_id="%0")
+        app.on_tmux_tree_view_pane_activated(msg)
+        app._client.navigate_to.assert_called_once_with("%0")
+
+
+# ============================================================================
+# Keyboard: quit and refresh
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_quit_key():
+    """Pressing q should exit the app."""
+    app = _patched_app()
+    async with app.run_test() as pilot:
+        await pilot.press("q")
+    # After context manager exits the app has stopped — just verify no exception
+
+
+@pytest.mark.asyncio
+async def test_refresh_key():
+    """Pressing r should trigger an additional get_tree call."""
+    app = _patched_app()
+    async with app.run_test() as pilot:
+        # Focus the tree so 'r' is handled by the app-level binding
+        app.query_one("#tmux-tree").focus()
+        initial_calls = app._client.get_tree.call_count
+        await pilot.press("r")
+        assert app._client.get_tree.call_count > initial_calls
+
+
+# ============================================================================
+# Filter: name filter (/ toggle)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_filter_input_toggle():
+    """Pressing / should toggle filter-input visibility."""
+    from textual.widgets import Input
+    app = _patched_app()
+    async with app.run_test() as pilot:
+        fi = app.query_one("#filter-input", Input)
+
+        # Initially hidden
+        assert not fi.has_class("-active")
+
+        # action_filter() directly — avoids key routing ambiguity
+        app.action_filter()
+        await pilot.pause()
+        assert fi.has_class("-active")
+
+        # Second call hides it again
+        app.action_filter()
+        await pilot.pause()
+        assert not fi.has_class("-active")
+
+
+# ============================================================================
+# Filter: status filters (e / w / a) — call actions directly
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_status_filter_error_toggle():
+    """action_filter_errors should toggle ERROR filter on/off."""
+    app = _patched_app()
+    async with app.run_test() as pilot:
+        app.action_filter_errors()
+        await pilot.pause()
+        assert app._status_filter == {PaneStatus.ERROR}
+
+        # Second call should clear the filter
+        app.action_filter_errors()
+        await pilot.pause()
+        assert app._status_filter is None
+
+
+@pytest.mark.asyncio
+async def test_status_filter_waiting():
+    """action_filter_waiting should set WAITING_INPUT filter."""
+    app = _patched_app()
+    async with app.run_test() as pilot:
+        app.action_filter_waiting()
+        await pilot.pause()
+        assert app._status_filter == {PaneStatus.WAITING_INPUT}
+
+        # Second call clears it
+        app.action_filter_waiting()
+        await pilot.pause()
+        assert app._status_filter is None
+
+
+@pytest.mark.asyncio
+async def test_filter_all_clears():
+    """action_filter_all should clear both status and name filters."""
+    from textual.widgets import Input
+    app = _patched_app()
+    async with app.run_test() as pilot:
+        # Set some filter state
+        app.action_filter_errors()
+        await pilot.pause()
+        assert app._status_filter is not None
+
+        # Now clear everything
+        app.action_filter_all()
+        await pilot.pause()
+        assert app._status_filter is None
+        assert app._name_filter == ""
+        fi = app.query_one("#filter-input", Input)
+        assert not fi.has_class("-active")

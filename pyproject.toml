@@ -15,6 +15,12 @@ dependencies = [
 [project.scripts]
 muxpilot = "muxpilot.app:main"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]
 build-backend = "uv_build"
