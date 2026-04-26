@@ -46,37 +46,134 @@ class TmuxTreeView(Tree[str]):
         super().__init__("tmux", name=name, id=id)
         self._pane_map: dict[str, tuple[SessionInfo, WindowInfo, PaneInfo]] = {}
         self._node_data: dict[int, tuple[str, SessionInfo | None, WindowInfo | None, PaneInfo | None]] = {}
+        self._expanded_paths: set[str] = set()
+        self._selected_path: str | None = None
 
-    def populate(self, tree: TmuxTree, current_pane_id: str | None = None) -> None:
+    def _get_node_path(self, node: TreeNode[str]) -> str:
+        """Generate a unique string path for a node to preserve state."""
+        data = self._node_data.get(node.id)
+        if not data:
+            return ""
+        node_type, session, window, pane = data
+        if node_type == "session" and session:
+            return f"s:{session.session_id}"
+        elif node_type == "window" and session and window:
+            return f"s:{session.session_id}/w:{window.window_id}"
+        elif node_type == "pane" and session and window and pane:
+            return f"s:{session.session_id}/w:{window.window_id}/p:{pane.pane_id}"
+        return ""
+
+    def _save_state(self) -> None:
+        """Save the expanded state of all nodes and the currently selected node."""
+        self._expanded_paths.clear()
+        
+        # Save expanded nodes
+        nodes_to_check = [self.root]
+        while nodes_to_check:
+            node = nodes_to_check.pop(0)
+            if node.is_expanded and node != self.root:
+                path = self._get_node_path(node)
+                if path:
+                    self._expanded_paths.add(path)
+            nodes_to_check.extend(node.children)
+
+        # Save selected node
+        if self.cursor_node and self.cursor_node != self.root:
+            self._selected_path = self._get_node_path(self.cursor_node)
+        else:
+            self._selected_path = None
+
+    def _restore_state(self) -> None:
+        """Restore the expanded state and selection."""
+        nodes_to_check = [self.root]
+        target_cursor_node = None
+        
+        while nodes_to_check:
+            node = nodes_to_check.pop(0)
+            if node != self.root:
+                path = self._get_node_path(node)
+                if path in self._expanded_paths:
+                    node.expand()
+                if path == self._selected_path:
+                    target_cursor_node = node
+            nodes_to_check.extend(node.children)
+
+        if target_cursor_node:
+            self.cursor_line = target_cursor_node.line
+
+    def populate(
+        self,
+        tree: TmuxTree,
+        current_pane_id: str | None = None,
+        status_filter: set[PaneStatus] | None = None,
+        name_filter: str = ""
+    ) -> None:
         """Populate (or repopulate) the tree from a TmuxTree snapshot."""
+        # Only save state if the tree is not empty
+        if self.root.children:
+            self._save_state()
+            
         self.clear()
         self._pane_map.clear()
         self._node_data.clear()
         self.root.expand()
+        
+        name_filter_lower = name_filter.lower()
 
         for session in tree.sessions:
-            session_node = self.root.add(
-                session.display_label,
-                expand=True,
-            )
-            self._node_data[session_node.id] = ("session", session, None, None)
-
+            # Check session name filter
+            session_match = not name_filter_lower or name_filter_lower in session.session_name.lower()
+            
+            # Filter windows/panes
+            windows_to_add = []
             for window in session.windows:
-                window_node = session_node.add(
-                    window.display_label,
+                window_match = not name_filter_lower or name_filter_lower in window.window_name.lower()
+                
+                panes_to_add = []
+                for pane in window.panes:
+                    # Apply status filter
+                    if status_filter and pane.status not in status_filter:
+                        continue
+                        
+                    # Apply name filter (if neither session nor window matched, check pane cmd/path)
+                    if name_filter_lower and not (session_match or window_match):
+                        if (name_filter_lower not in pane.current_command.lower() and 
+                            name_filter_lower not in pane.current_path.lower()):
+                            continue
+                            
+                    panes_to_add.append(pane)
+                
+                # If we have panes to add, or the window itself matches the filter, keep it
+                if panes_to_add or (window_match and not status_filter):
+                    windows_to_add.append((window, panes_to_add))
+            
+            # If we have windows to add, or the session itself matches the filter, keep it
+            if windows_to_add or (session_match and not status_filter):
+                session_node = self.root.add(
+                    session.display_label,
                     expand=True,
                 )
-                self._node_data[window_node.id] = ("window", session, window, None)
+                self._node_data[session_node.id] = ("session", session, None, None)
 
-                for pane in window.panes:
-                    is_self = pane.pane_id == current_pane_id
-                    label = pane.display_label
-                    if is_self:
-                        label += " (self)"
+                for window, panes in windows_to_add:
+                    window_node = session_node.add(
+                        window.display_label,
+                        expand=True,
+                    )
+                    self._node_data[window_node.id] = ("window", session, window, None)
 
-                    pane_node = window_node.add_leaf(label)
-                    self._node_data[pane_node.id] = ("pane", session, window, pane)
-                    self._pane_map[pane.pane_id] = (session, window, pane)
+                    for pane in panes:
+                        is_self = pane.pane_id == current_pane_id
+                        label = pane.display_label
+                        if is_self:
+                            label += " (self)"
+
+                        pane_node = window_node.add_leaf(label)
+                        self._node_data[pane_node.id] = ("pane", session, window, pane)
+                        self._pane_map[pane.pane_id] = (session, window, pane)
+
+        # Restore state after populating
+        self._restore_state()
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted[str]) -> None:
         """When a node is highlighted, emit NodeInfo for the detail panel."""
@@ -100,13 +197,3 @@ class TmuxTreeView(Tree[str]):
             if node_type == "pane" and pane is not None:
                 self.post_message(self.PaneActivated(pane_id=pane.pane_id))
 
-    def filter_by_status(self, statuses: set[PaneStatus] | None) -> None:
-        """Show only panes matching the given statuses. None = show all."""
-        # For simplicity in Phase 1, we just re-render with filtering
-        # Full implementation in Phase 2
-        pass
-
-    def filter_by_name(self, query: str) -> None:
-        """Filter sessions/windows by name. Empty string = show all."""
-        # Phase 2 implementation
-        pass

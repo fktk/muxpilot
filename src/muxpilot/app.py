@@ -7,9 +7,9 @@ import sys
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Header, Static, Input
 
-from muxpilot.models import TmuxTree
+from muxpilot.models import TmuxTree, PaneStatus
 from muxpilot.tmux_client import TmuxClient
 from muxpilot.watcher import TmuxWatcher
 from muxpilot.widgets.detail_panel import DetailPanel
@@ -51,6 +51,16 @@ class MuxpilotApp(App[str | None]):
         height: 1fr;
     }
 
+    #filter-input {
+        dock: top;
+        display: none;
+        margin-bottom: 1;
+    }
+
+    #filter-input.-active {
+        display: block;
+    }
+
     #no-tmux-message {
         width: 100%;
         height: 100%;
@@ -76,11 +86,14 @@ class MuxpilotApp(App[str | None]):
         self._watcher = TmuxWatcher(self._client)
         self._current_pane_id: str | None = None
         self._navigate_to: str | None = None
+        self._status_filter: set[PaneStatus] | None = None
+        self._name_filter: str = ""
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="main-container"):
             with Vertical(id="tree-panel"):
+                yield Input(placeholder="Filter by name...", id="filter-input")
                 yield TmuxTreeView(id="tmux-tree")
             yield DetailPanel(id="detail-panel")
         yield StatusBar(id="status-bar")
@@ -108,7 +121,12 @@ class MuxpilotApp(App[str | None]):
 
         # Update tree view
         tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
-        tree_widget.populate(tree, self._current_pane_id)
+        tree_widget.populate(
+            tree,
+            current_pane_id=self._current_pane_id,
+            status_filter=self._status_filter,
+            name_filter=self._name_filter
+        )
 
         # Update status bar
         status_bar = self.query_one("#status-bar", StatusBar)
@@ -133,7 +151,12 @@ class MuxpilotApp(App[str | None]):
         # Only rebuild tree if structure changed
         if events:
             tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
-            tree_widget.populate(tree, self._current_pane_id)
+            tree_widget.populate(
+                tree,
+                current_pane_id=self._current_pane_id,
+                status_filter=self._status_filter,
+                name_filter=self._name_filter
+            )
 
             for event in events:
                 status_bar.show_event(event)
@@ -174,21 +197,58 @@ class MuxpilotApp(App[str | None]):
             timeout=10,
         )
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle filter input changes."""
+        if event.input.id == "filter-input":
+            self._name_filter = event.value
+            self._do_refresh()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle Enter key in filter input."""
+        if event.input.id == "filter-input":
+            # Return focus to tree
+            self.query_one("#tmux-tree").focus()
+
     def action_filter(self) -> None:
-        """Open filter input (/ key). Phase 2 stub."""
-        self.notify("Filter: coming soon", timeout=2)
+        """Open filter input (/ key)."""
+        filter_input = self.query_one("#filter-input", Input)
+        if filter_input.has_class("-active"):
+            filter_input.remove_class("-active")
+            filter_input.value = ""
+            self.query_one("#tmux-tree").focus()
+        else:
+            filter_input.add_class("-active")
+            filter_input.focus()
 
     def action_filter_errors(self) -> None:
-        """Filter to show only error panes (e key). Phase 2 stub."""
-        self.notify("Errors filter: coming soon", timeout=2)
+        """Filter to show only error panes (e key)."""
+        if self._status_filter == {PaneStatus.ERROR}:
+            self._status_filter = None
+            self.notify("Error filter removed", timeout=2)
+        else:
+            self._status_filter = {PaneStatus.ERROR}
+            self.notify("Filtering by errors", timeout=2)
+        self._do_refresh()
 
     def action_filter_waiting(self) -> None:
-        """Filter to show only waiting panes (w key). Phase 2 stub."""
-        self.notify("Waiting filter: coming soon", timeout=2)
+        """Filter to show only waiting panes (w key)."""
+        if self._status_filter == {PaneStatus.WAITING_INPUT}:
+            self._status_filter = None
+            self.notify("Waiting filter removed", timeout=2)
+        else:
+            self._status_filter = {PaneStatus.WAITING_INPUT}
+            self.notify("Filtering by waiting", timeout=2)
+        self._do_refresh()
 
     def action_filter_all(self) -> None:
-        """Clear all filters (a key). Phase 2 stub."""
+        """Clear all filters (a key)."""
+        self._status_filter = None
+        self._name_filter = ""
+        filter_input = self.query_one("#filter-input", Input)
+        filter_input.value = ""
+        filter_input.remove_class("-active")
         self.notify("All filters cleared", timeout=2)
+        self._do_refresh()
 
 
 def main() -> None:
