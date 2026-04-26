@@ -49,7 +49,7 @@ uvx --from git+https://github.com/fktk/muxpilot.git muxpilot
 |------|-----------|
 | `↑` / `k` | カーソルを上に移動 |
 | `↓` / `j` | カーソルを下に移動 |
-| `Enter` | 選択したペインにジャンプ（muxpilotを終了しフォーカス移動） |
+| `Enter` | 選択したペインにジャンプ（muxpilot は裏で起動し続けます） |
 | `Space` | ツリーノードの展開 / 折り畳み |
 | `r` | 情報の手動リフレッシュ |
 | `/` | フィルタ入力のオン/オフ |
@@ -58,17 +58,14 @@ uvx --from git+https://github.com/fktk/muxpilot.git muxpilot
 | `a` | フィルタを解除して全表示 |
 | `q` | 終了 |
 
-## 💡 おすすめの使い方：tmuxポップアップ
+## 💡 おすすめの使い方：ダッシュボード運用（司令塔）
 
-muxpilot は、対象のペインにジャンプした際に自動で終了する設計になっています。
-このため、tmux の `display-popup` 機能を使って画面中央にフローティング表示させる **「コマンドパレット」風の運用** が最も快適です。
+muxpilot は「**ダッシュボードとして常に起動させ続ける**」設計になっています。
+Enter キーを押して他のペインにジャンプしても、muxpilot 自体は終了せずに裏でモニタリングを継続します。
 
-`~/.tmux.conf` に以下の設定を追加してください。（パスは環境に合わせて変更してください）
-
-```tmux
-# Prefix + m で muxpilot をポップアップ表示
-bind m display-popup -E -w 80% -h 80% "cd ~/projects/python/pymux && uv run muxpilot"
-```
+**おすすめの画面構成**:
+tmux の画面を分割し、左側（または上部）に muxpilot を常駐させます。
+muxpilot から `Enter` で作業ペインに飛び、用事が済んだら tmux のショートカット（例: `Prefix + 左矢印` 等）で muxpilot のペインに戻ってくる、という司令塔のような使い方が最適です。
 
 ## 🛠 技術スタック
 

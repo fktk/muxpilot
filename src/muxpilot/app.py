@@ -173,7 +173,7 @@ class MuxpilotApp(App[str | None]):
             detail.show_session(message.session_info)
 
     def on_tmux_tree_view_pane_activated(self, message: TmuxTreeView.PaneActivated) -> None:
-        """Handle pane activation (Enter) → navigate to the pane and exit."""
+        """Handle pane activation (Enter) → navigate to the pane."""
         pane_id = message.pane_id
 
         # Don't navigate to our own pane
@@ -181,8 +181,11 @@ class MuxpilotApp(App[str | None]):
             self.notify("This is the current pane", severity="warning")
             return
 
-        self._navigate_to = pane_id
-        self.exit(pane_id)
+        success = self._client.navigate_to(pane_id)
+        if success:
+            self.notify(f"Navigated to {pane_id}")
+        else:
+            self.notify(f"Failed to navigate to {pane_id}", severity="error")
 
     def action_refresh(self) -> None:
         """Manual refresh (r key)."""
