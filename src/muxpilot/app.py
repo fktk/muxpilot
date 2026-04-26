@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 
 from textual.app import App, ComposeResult
@@ -99,22 +100,22 @@ class MuxpilotApp(App[str | None]):
         yield StatusBar(id="status-bar")
         yield Footer()
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         """Initialize the app after mounting."""
         if not self._client.is_inside_tmux():
             # Still allow running for development, but show a warning
             pass
 
         self._current_pane_id = self._client.get_current_pane_id()
-        self._do_refresh()
+        await self._do_refresh()
 
         # Start the polling timer
         self.set_interval(POLL_INTERVAL_SECONDS, self._poll_tmux)
 
-    def _do_refresh(self) -> None:
+    async def _do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
         try:
-            tree, events = self._watcher.poll()
+            tree, events = await asyncio.to_thread(self._watcher.poll)
         except Exception as e:
             self.notify(f"Error fetching tmux info: {e}", severity="error")
             return
@@ -140,7 +141,7 @@ class MuxpilotApp(App[str | None]):
     async def _poll_tmux(self) -> None:
         """Periodic polling callback."""
         try:
-            tree, events = self._watcher.poll()
+            tree, events = await asyncio.to_thread(self._watcher.poll)
         except Exception:
             return
 
@@ -187,9 +188,9 @@ class MuxpilotApp(App[str | None]):
         else:
             self.notify(f"Failed to navigate to {pane_id}", severity="error")
 
-    def action_refresh(self) -> None:
+    async def action_refresh(self) -> None:
         """Manual refresh (r key)."""
-        self._do_refresh()
+        await self._do_refresh()
         self.notify("Refreshed", timeout=2)
 
     def action_help(self) -> None:
@@ -200,11 +201,11 @@ class MuxpilotApp(App[str | None]):
             timeout=10,
         )
 
-    def on_input_changed(self, event: Input.Changed) -> None:
+    async def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
         if event.input.id == "filter-input":
             self._name_filter = event.value
-            self._do_refresh()
+            await self._do_refresh()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle Enter key in filter input."""
@@ -223,7 +224,7 @@ class MuxpilotApp(App[str | None]):
             filter_input.add_class("-active")
             filter_input.focus()
 
-    def action_filter_errors(self) -> None:
+    async def action_filter_errors(self) -> None:
         """Filter to show only error panes (e key)."""
         if self._status_filter == {PaneStatus.ERROR}:
             self._status_filter = None
@@ -231,9 +232,9 @@ class MuxpilotApp(App[str | None]):
         else:
             self._status_filter = {PaneStatus.ERROR}
             self.notify("Filtering by errors", timeout=2)
-        self._do_refresh()
+        await self._do_refresh()
 
-    def action_filter_waiting(self) -> None:
+    async def action_filter_waiting(self) -> None:
         """Filter to show only waiting panes (w key)."""
         if self._status_filter == {PaneStatus.WAITING_INPUT}:
             self._status_filter = None
@@ -241,9 +242,9 @@ class MuxpilotApp(App[str | None]):
         else:
             self._status_filter = {PaneStatus.WAITING_INPUT}
             self.notify("Filtering by waiting", timeout=2)
-        self._do_refresh()
+        await self._do_refresh()
 
-    def action_filter_all(self) -> None:
+    async def action_filter_all(self) -> None:
         """Clear all filters (a key)."""
         self._status_filter = None
         self._name_filter = ""
@@ -251,7 +252,7 @@ class MuxpilotApp(App[str | None]):
         filter_input.value = ""
         filter_input.remove_class("-active")
         self.notify("All filters cleared", timeout=2)
-        self._do_refresh()
+        await self._do_refresh()
 
 
 def main() -> None:

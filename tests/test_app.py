@@ -148,12 +148,12 @@ async def test_status_filter_error_toggle():
     """action_filter_errors should toggle ERROR filter on/off."""
     app = _patched_app()
     async with app.run_test() as pilot:
-        app.action_filter_errors()
+        await app.action_filter_errors()
         await pilot.pause()
         assert app._status_filter == {PaneStatus.ERROR}
 
         # Second call should clear the filter
-        app.action_filter_errors()
+        await app.action_filter_errors()
         await pilot.pause()
         assert app._status_filter is None
 
@@ -163,12 +163,12 @@ async def test_status_filter_waiting():
     """action_filter_waiting should set WAITING_INPUT filter."""
     app = _patched_app()
     async with app.run_test() as pilot:
-        app.action_filter_waiting()
+        await app.action_filter_waiting()
         await pilot.pause()
         assert app._status_filter == {PaneStatus.WAITING_INPUT}
 
         # Second call clears it
-        app.action_filter_waiting()
+        await app.action_filter_waiting()
         await pilot.pause()
         assert app._status_filter is None
 
@@ -180,12 +180,12 @@ async def test_filter_all_clears():
     app = _patched_app()
     async with app.run_test() as pilot:
         # Set some filter state
-        app.action_filter_errors()
+        await app.action_filter_errors()
         await pilot.pause()
         assert app._status_filter is not None
 
         # Now clear everything
-        app.action_filter_all()
+        await app.action_filter_all()
         await pilot.pause()
         assert app._status_filter is None
         assert app._name_filter == ""

@@ -173,7 +173,10 @@ class TmuxTreeView(Tree[str]):
                         self._pane_map[pane.pane_id] = (session, window, pane)
 
         # Restore state after populating
-        self._restore_state()
+        if not self._expanded_paths:
+            self.root.expand_all()
+        else:
+            self._restore_state()
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted[str]) -> None:
         """When a node is highlighted, emit NodeInfo for the detail panel."""
