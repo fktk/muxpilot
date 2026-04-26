@@ -112,6 +112,9 @@ class MuxpilotApp(App[str | None]):
         # Start the polling timer
         self.set_interval(POLL_INTERVAL_SECONDS, self._poll_tmux)
 
+        # Set initial focus to the tree to avoid the hidden input capturing keys
+        self.query_one("#tmux-tree").focus()
+
     async def _do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
         try:
