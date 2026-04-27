@@ -38,31 +38,32 @@ class TestPaneInfoDisplayLabel:
         pane = make_pane(
             pane_id="%5",
             current_command="vim",
-            current_path="/tmp",
+            current_path="/tmp/work/dir",
             status=status,
         )
         expected_icon = STATUS_ICONS[status]
         assert pane.display_label.startswith(expected_icon)
-        assert "%5" in pane.display_label
+        assert "work/dir" in pane.display_label
         assert "[vim]" in pane.display_label
+        assert "%5" not in pane.display_label
 
     def test_display_label_path_shortening(self) -> None:
-        """Home directory should be shortened to ~."""
+        """Home directory path should be shortened to 2 levels."""
         home = os.path.expanduser("~")
-        pane = make_pane(current_path=f"{home}/projects/foo")
-        assert "~/projects/foo" in pane.display_label
+        pane = make_pane(current_path=f"{home}/projects/foo/bar")
+        assert "foo/bar" in pane.display_label
 
     def test_display_label_non_home_path(self) -> None:
-        """Paths outside home should not be shortened."""
-        pane = make_pane(current_path="/tmp/work")
-        assert "/tmp/work" in pane.display_label
+        """Paths outside home should be shortened to 2 levels."""
+        pane = make_pane(current_path="/tmp/a/b/c")
+        assert "b/c" in pane.display_label
 
     def test_display_label_empty_path(self) -> None:
         """Empty path should not cause errors."""
         pane = make_pane(current_path="")
         label = pane.display_label
         assert "[]" not in label  # command brackets still present
-        assert pane.pane_id in label
+        assert "%0" not in label
 
     def test_display_label_empty_command(self) -> None:
         """Empty command should produce empty brackets."""

@@ -45,8 +45,16 @@ class PaneInfo:
     def display_label(self) -> str:
         """Label for tree view display."""
         icon = STATUS_ICONS.get(self.status, "?")
-        path = _shorten_path(self.current_path)
-        return f"{icon} {self.pane_id} [{self.current_command}] {path}"
+        
+        # パスを親ディレクトリとディレクトリ名の2階層に短縮
+        path = self.current_path
+        parts = path.rstrip("/").split("/")
+        if len(parts) >= 2:
+            path = f"{parts[-2]}/{parts[-1]}"
+        elif len(parts) == 1 and parts[0] != "":
+            path = parts[0]
+            
+        return f"{icon} [{self.current_command}] {path}"
 
 
 @dataclass

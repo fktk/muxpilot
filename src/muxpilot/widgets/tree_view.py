@@ -99,7 +99,7 @@ class TmuxTreeView(Tree[str]):
             nodes_to_check.extend(node.children)
 
         if target_cursor_node:
-            self.cursor_line = target_cursor_node.line
+            self.move_cursor(target_cursor_node)
 
     def populate(
         self,
@@ -163,10 +163,10 @@ class TmuxTreeView(Tree[str]):
                     self._node_data[window_node.id] = ("window", session, window, None)
 
                     for pane in panes:
-                        is_self = pane.pane_id == current_pane_id
+                        is_active = pane.is_active
                         label = pane.display_label
-                        if is_self:
-                            label += " (self)"
+                        if is_active:
+                            label = f"➜ {label}"
 
                         pane_node = window_node.add_leaf(label)
                         self._node_data[pane_node.id] = ("pane", session, window, pane)

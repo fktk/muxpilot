@@ -123,6 +123,11 @@ class MuxpilotApp(App[str | None]):
             self.notify(f"Error fetching tmux info: {e}", severity="error")
             return
 
+        # Update current pane ID from the tree's active pane
+        active_pane = next((p for s in tree.sessions for w in s.windows for p in w.panes if p.is_active), None)
+        if active_pane:
+            self._current_pane_id = active_pane.pane_id
+
         # Update tree view
         tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
         tree_widget.populate(
@@ -131,7 +136,7 @@ class MuxpilotApp(App[str | None]):
             status_filter=self._status_filter,
             name_filter=self._name_filter
         )
-
+        
         # Update status bar
         status_bar = self.query_one("#status-bar", StatusBar)
         status_bar.update_stats(tree)
@@ -187,7 +192,12 @@ class MuxpilotApp(App[str | None]):
 
         success = self._client.navigate_to(pane_id)
         if success:
+            # We should NOT use asyncio.create_task here because this method is not an async function
+            # and we are not in an async context where create_task is appropriate without a loop.
+            # Instead, we can use self.call_later or just rely on the polling.
+            # But since we want it immediate, let's use self.set_interval or just trigger refresh.
             self.notify(f"Navigated to {pane_id}")
+            asyncio.run_coroutine_threadsafe(self._do_refresh(), asyncio.get_event_loop())
         else:
             self.notify(f"Failed to navigate to {pane_id}", severity="error")
 
