@@ -70,6 +70,18 @@ class TestPaneInfoDisplayLabel:
         pane = make_pane(current_command="")
         assert "[]" in pane.display_label
 
+    def test_display_label_self_pane_shows_muxpilot(self) -> None:
+        """Self pane should show 'muxpilot' instead of path."""
+        pane = make_pane(is_self=True, current_path="/some/long/path", current_command="python")
+        label = pane.display_label
+        assert "muxpilot" in label
+        assert "/some/long/path" not in label
+
+    def test_display_label_non_self_pane_shows_path(self) -> None:
+        """Non-self pane should show path as normal."""
+        pane = make_pane(is_self=False, current_path="/home/user/project")
+        assert "muxpilot" not in pane.display_label
+
 
 # ============================================================================
 # WindowInfo.display_label

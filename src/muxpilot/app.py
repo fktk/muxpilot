@@ -216,7 +216,7 @@ class MuxpilotApp(App[str | None]):
 
     def action_help(self) -> None:
         """Show help (? key)."""
-        self._notify_channel.send("j/k: Navigate  Enter: Go to pane  r: Refresh  /: Filter  e: Errors  w: Waiting  a: All  q: Quit")
+        self._notify_channel.send("j/k: Navigate  Enter: Go to pane  r: Refresh  /: Filter  e: Errors  w: Waiting  c: Clear filters  a: Collapse/Expand all  q: Quit")
 
     async def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""

@@ -204,3 +204,37 @@ class TestPoll:
         self_pane = [p for p in new_tree.all_panes() if p.pane_id == "%5"][0]
         assert self_pane.status == PaneStatus.ACTIVE
         client.capture_pane_content.assert_not_called()
+
+    def test_active_pane_change_emits_event(self):
+        """Switching the active pane in tmux should emit a focus_changed event."""
+        tree1 = make_tree(sessions=[make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", is_active=True),
+            make_pane(pane_id="%1", is_active=False),
+        ])])])
+        tree2 = make_tree(sessions=[make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", is_active=False),
+            make_pane(pane_id="%1", is_active=True),
+        ])])])
+        client = make_mock_client(tree=tree1)
+        w = TmuxWatcher(client)
+        w.poll()  # first poll
+
+        client.get_tree.return_value = tree2
+        _, events = w.poll()
+        focus_events = [e for e in events if e.event_type == "focus_changed"]
+        assert len(focus_events) == 1
+        assert focus_events[0].pane_id == "%1"
+
+    def test_no_focus_event_when_active_pane_unchanged(self):
+        """No focus_changed event when the active pane stays the same."""
+        tree = make_tree(sessions=[make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", is_active=True),
+            make_pane(pane_id="%1", is_active=False),
+        ])])])
+        client = make_mock_client(tree=tree)
+        w = TmuxWatcher(client)
+        w.poll()
+
+        _, events = w.poll()
+        focus_events = [e for e in events if e.event_type == "focus_changed"]
+        assert focus_events == []

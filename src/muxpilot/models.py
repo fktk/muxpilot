@@ -40,12 +40,16 @@ class PaneInfo:
     width: int
     height: int
     status: PaneStatus = PaneStatus.UNKNOWN
+    is_self: bool = False
 
     @property
     def display_label(self) -> str:
         """Label for tree view display."""
         icon = STATUS_ICONS.get(self.status, "?")
-        
+
+        if self.is_self:
+            return f"{icon} [muxpilot]"
+
         # パスを親ディレクトリとディレクトリ名の2階層に短縮
         path = self.current_path
         parts = path.rstrip("/").split("/")

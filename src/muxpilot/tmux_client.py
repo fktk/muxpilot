@@ -39,6 +39,7 @@ class TmuxClient:
     def get_tree(self) -> TmuxTree:
         """Fetch the complete tmux session/window/pane hierarchy."""
         tree = TmuxTree(timestamp=time.time())
+        self_pane_id = self.get_current_pane_id()
 
         for session in self.server.sessions:
             session_info = SessionInfo(
@@ -58,14 +59,16 @@ class TmuxClient:
                 )
 
                 for pane in window.panes:
+                    pane_id = pane.pane_id or ""
                     pane_info = PaneInfo(
-                        pane_id=pane.pane_id or "",
+                        pane_id=pane_id,
                         pane_index=int(pane.pane_index or 0),
                         current_command=pane.pane_current_command or "",
                         current_path=pane.pane_current_path or "",
                         is_active=_is_active_pane(pane),
                         width=int(pane.pane_width or 0),
                         height=int(pane.pane_height or 0),
+                        is_self=(pane_id == self_pane_id),
                     )
                     window_info.panes.append(pane_info)
 

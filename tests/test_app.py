@@ -249,6 +249,170 @@ async def test_cursor_preserved_after_repopulate():
             )
 
 
+# ============================================================================
+# StatusBar: icon legend display
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_status_bar_shows_icon_legend():
+    """StatusBar should display the icon-to-status legend."""
+    from muxpilot.models import STATUS_ICONS
+    from muxpilot.widgets.status_bar import StatusBar
+
+    tree = make_tree()
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        sb = app.query_one("#status-bar", StatusBar)
+        text = str(sb.render())
+
+        # Each status icon and its label should appear
+        for status, icon in STATUS_ICONS.items():
+            assert icon in text, f"Icon {icon!r} for {status.value} not found in status bar"
+
+
+# ============================================================================
+# Keyboard: 'a' toggles collapse/expand on ALL tree nodes
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_a_key_collapses_all_nodes():
+    """Pressing 'a' when nodes are expanded should collapse all session/window nodes."""
+    tree = make_tree(sessions=[
+        make_session(session_id="$0", session_name="s0", windows=[
+            make_window(window_id="@0", panes=[make_pane(pane_id="%0")]),
+            make_window(window_id="@1", window_name="w1", panes=[make_pane(pane_id="%1")]),
+        ]),
+        make_session(session_id="$1", session_name="s1", windows=[
+            make_window(window_id="@2", window_name="w2", panes=[make_pane(pane_id="%2")]),
+        ]),
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+
+        # All nodes should be expanded initially
+        expandable = [n for n in _all_nodes(tw) if n.allow_expand and n != tw.root]
+        assert all(n.is_expanded for n in expandable), "All nodes should start expanded"
+
+        # Press 'a' → all should collapse
+        await pilot.press("a")
+        await pilot.pause()
+        expandable = [n for n in _all_nodes(tw) if n.allow_expand and n != tw.root]
+        assert all(not n.is_expanded for n in expandable), "All nodes should be collapsed after 'a'"
+
+
+@pytest.mark.asyncio
+async def test_a_key_expands_all_when_all_collapsed():
+    """Pressing 'a' when all nodes are collapsed should expand all."""
+    tree = make_tree(sessions=[
+        make_session(session_id="$0", session_name="s0", windows=[
+            make_window(window_id="@0", panes=[make_pane(pane_id="%0")]),
+        ]),
+        make_session(session_id="$1", session_name="s1", windows=[
+            make_window(window_id="@1", window_name="w1", panes=[make_pane(pane_id="%1")]),
+        ]),
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+
+        # Collapse all first
+        await pilot.press("a")
+        await pilot.pause()
+
+        # Press 'a' again → all should expand
+        await pilot.press("a")
+        await pilot.pause()
+        expandable = [n for n in _all_nodes(tw) if n.allow_expand and n != tw.root]
+        assert all(n.is_expanded for n in expandable), "All nodes should be expanded after second 'a'"
+
+
+def _all_nodes(tw: TmuxTreeView):
+    """Collect all tree nodes via BFS."""
+    nodes = []
+    queue = [tw.root]
+    while queue:
+        node = queue.pop(0)
+        nodes.append(node)
+        queue.extend(node.children)
+    return nodes
+
+
+# ============================================================================
+# Notifications: status_changed events should NOT be sent to notify channel
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_status_changed_events_not_notified():
+    """status_changed events must not be sent to NotifyChannel."""
+    from muxpilot.models import TmuxEvent
+
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        # Simulate a status_changed event arriving via _do_refresh
+        status_event = TmuxEvent(
+            event_type="status_changed",
+            pane_id="%0",
+            old_status=PaneStatus.IDLE,
+            new_status=PaneStatus.ACTIVE,
+            message="%0: idle → active",
+        )
+        # Call the event handling code path directly
+        status_bar = app.query_one("#status-bar")
+        status_bar.show_event(status_event)
+
+        # Clear prior send() calls from mount
+        app._notify_channel.send.reset_mock()
+
+        # Simulate _poll_tmux delivering a status_changed event
+        from muxpilot.watcher import TmuxWatcher
+        with patch.object(app._watcher, "poll", return_value=(tree, [status_event])):
+            await app._poll_tmux()
+
+        # Verify notify_channel.send was NOT called with the status message
+        for call in app._notify_channel.send.call_args_list:
+            if call.args:
+                assert "idle" not in call.args[0].lower() and "active" not in call.args[0].lower(), \
+                    f"status_changed event was notified: {call.args[0]}"
+
+
+@pytest.mark.asyncio
+async def test_structural_events_still_notified():
+    """Structural events (pane_added, etc.) should still be sent to NotifyChannel."""
+    from muxpilot.models import TmuxEvent
+
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._notify_channel.send.reset_mock()
+
+        structural_event = TmuxEvent(
+            event_type="pane_added",
+            pane_id="%1",
+            message="Pane added: %1",
+        )
+        from muxpilot.watcher import TmuxWatcher
+        with patch.object(app._watcher, "poll", return_value=(tree, [structural_event])):
+            await app._poll_tmux()
+
+        # Verify the structural event WAS notified
+        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
+        assert "Pane added: %1" in messages
+
+
+# ============================================================================
+# NotifyChannel lifecycle
+# ============================================================================
+
+
 @pytest.mark.asyncio
 async def test_notify_channel_started_on_mount():
     """on_mount で NotifyChannel.start() が呼ばれること。"""

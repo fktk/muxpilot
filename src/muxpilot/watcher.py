@@ -176,7 +176,7 @@ class TmuxWatcher:
         old_tree: TmuxTree,
         new_tree: TmuxTree,
     ) -> list[TmuxEvent]:
-        """Detect additions/removals of sessions, windows, panes."""
+        """Detect additions/removals of sessions, windows, panes, and focus changes."""
         events: list[TmuxEvent] = []
 
         old_pane_ids = {p.pane_id for p in old_tree.all_panes()}
@@ -220,5 +220,18 @@ class TmuxWatcher:
                     message=f"Session removed: {name}",
                 )
             )
+
+        # Detect active pane (focus) changes
+        old_active = {p.pane_id for p in old_tree.all_panes() if p.is_active}
+        new_active = {p.pane_id for p in new_tree.all_panes() if p.is_active}
+        if old_active != new_active:
+            for pane_id in new_active - old_active:
+                events.append(
+                    TmuxEvent(
+                        event_type="focus_changed",
+                        pane_id=pane_id,
+                        message=f"Focus changed to: {pane_id}",
+                    )
+                )
 
         return events

@@ -13,16 +13,34 @@ class StatusBar(Static):
     DEFAULT_CSS = """
     StatusBar {
         dock: bottom;
-        height: 1;
+        height: 2;
         background: $primary-background;
         color: $text;
         padding: 0 1;
     }
     """
 
+    # Icon legend labels
+    _STATUS_LABELS: dict[PaneStatus, str] = {
+        PaneStatus.ACTIVE: "active",
+        PaneStatus.IDLE: "idle",
+        PaneStatus.WAITING_INPUT: "waiting",
+        PaneStatus.ERROR: "error",
+        PaneStatus.COMPLETED: "done",
+        PaneStatus.UNKNOWN: "unknown",
+    }
+
     def __init__(self, name: str | None = None, id: str | None = None) -> None:
         super().__init__("", name=name, id=id)
         self._last_event: str = ""
+
+    @staticmethod
+    def _icon_legend() -> str:
+        """Build the icon→status legend string."""
+        return "  ".join(
+            f"{STATUS_ICONS[s]}:{StatusBar._STATUS_LABELS[s]}"
+            for s in PaneStatus
+        )
 
     def update_stats(self, tree: TmuxTree) -> None:
         """Update the status bar with tree statistics."""
@@ -48,6 +66,8 @@ class StatusBar(Static):
 
         if self._last_event:
             status_text += f"  │  {self._last_event}"
+
+        status_text += f"\n{self._icon_legend()}"
 
         self.update(status_text)
 
