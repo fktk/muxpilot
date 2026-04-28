@@ -10,6 +10,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Static, Input
 
+from muxpilot.label_store import LabelStore
 from muxpilot.models import TmuxTree, PaneStatus
 from muxpilot.notify_channel import NotifyChannel
 from muxpilot.tmux_client import TmuxClient
@@ -92,6 +93,7 @@ class MuxpilotApp(App[str | None]):
         self._status_filter: set[PaneStatus] | None = None
         self._name_filter: str = ""
         self._notify_channel = NotifyChannel()
+        self._label_store = LabelStore()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -121,6 +123,23 @@ class MuxpilotApp(App[str | None]):
         await self._notify_channel.start()
         self.set_interval(NOTIFY_CHECK_INTERVAL, self._check_notifications)
 
+    def _apply_labels(self, tree: TmuxTree) -> None:
+        """Apply custom labels from LabelStore to the tree snapshot."""
+        for session in tree.sessions:
+            label = self._label_store.get(session.session_name)
+            if label:
+                session.custom_label = label
+            for window in session.windows:
+                key = f"{session.session_name}.{window.window_index}"
+                label = self._label_store.get(key)
+                if label:
+                    window.custom_label = label
+                for pane in window.panes:
+                    key = f"{session.session_name}.{window.window_index}.{pane.pane_index}"
+                    label = self._label_store.get(key)
+                    if label:
+                        pane.custom_label = label
+
     async def _do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
         try:
@@ -128,6 +147,8 @@ class MuxpilotApp(App[str | None]):
         except Exception as e:
             self._notify_channel.send(f"Error fetching tmux info: {e}")
             return
+
+        self._apply_labels(tree)
 
         # Update current pane ID from the tree's active pane
         active_pane = next((p for s in tree.sessions for w in s.windows for p in w.panes if p.is_active), None)
@@ -159,6 +180,8 @@ class MuxpilotApp(App[str | None]):
             tree, events = await asyncio.to_thread(self._watcher.poll)
         except Exception:
             return
+
+        self._apply_labels(tree)
 
         # Update status bar
         status_bar = self.query_one("#status-bar", StatusBar)
