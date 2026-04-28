@@ -80,7 +80,7 @@ class MuxpilotApp(App[str | None]):
         Binding("slash", "filter", "Filter"),
         Binding("e", "filter_errors", "Errors only"),
         Binding("w", "filter_waiting", "Waiting only"),
-        Binding("a", "filter_all", "Show all"),
+        Binding("c", "filter_all", "Show all"),
     ]
 
     def __init__(self) -> None:
@@ -147,10 +147,11 @@ class MuxpilotApp(App[str | None]):
         status_bar = self.query_one("#status-bar", StatusBar)
         status_bar.update_stats(tree)
 
-        # Show events as notifications
+        # Show events as notifications (skip status_changed — shown via icons)
         for event in events:
             status_bar.show_event(event)
-            self._notify_channel.send(event.message)
+            if event.event_type not in ("status_changed", "focus_changed"):
+                self._notify_channel.send(event.message)
 
     async def _poll_tmux(self) -> None:
         """Periodic polling callback."""
@@ -175,7 +176,8 @@ class MuxpilotApp(App[str | None]):
 
             for event in events:
                 status_bar.show_event(event)
-                self._notify_channel.send(event.message)
+                if event.event_type not in ("status_changed", "focus_changed"):
+                    self._notify_channel.send(event.message)
 
     def on_tmux_tree_view_node_info(self, message: TmuxTreeView.NodeInfo) -> None:
         """Handle node highlight → update detail panel."""
