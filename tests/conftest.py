@@ -24,6 +24,7 @@ def make_pane(
     width: int = 80,
     height: int = 24,
     status: PaneStatus = PaneStatus.UNKNOWN,
+    is_self: bool = False,
 ) -> PaneInfo:
     """Create a PaneInfo with sensible defaults."""
     return PaneInfo(
@@ -35,6 +36,7 @@ def make_pane(
         width=width,
         height=height,
         status=status,
+        is_self=is_self,
     )
 
 
@@ -102,4 +104,23 @@ def make_mock_client(
     mock.capture_pane_content.return_value = capture_content or ["user@host:~$ "]
     mock.navigate_to.return_value = True
     mock.is_inside_tmux.return_value = current_pane_id is not None
+    return mock
+
+
+def make_mock_notify_channel() -> MagicMock:
+    """Create a mock NotifyChannel.
+
+    send() は何もしない、receive() は None を返す、start()/stop() は coroutine を返す。
+    """
+    import asyncio
+
+    mock = MagicMock()
+    mock.send.return_value = None
+    mock.receive.return_value = None
+
+    async def noop():
+        pass
+
+    mock.start = MagicMock(side_effect=lambda: noop())
+    mock.stop = MagicMock(side_effect=lambda: noop())
     return mock
