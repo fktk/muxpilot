@@ -74,7 +74,7 @@ class TestPaneInfoDisplayLabel:
         """Self pane should show 'muxpilot' instead of path."""
         pane = make_pane(is_self=True, current_path="/some/long/path", current_command="python")
         label = pane.display_label
-        assert "muxpilot" in label
+        assert label == "🚀 muxpilot"
         assert "/some/long/path" not in label
 
     def test_display_label_non_self_pane_shows_path(self) -> None:

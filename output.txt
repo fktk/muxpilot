@@ -1,0 +1,3 @@
+leaf22.line in timer: -1
+leaf22._line in timer: -1
+tree.cursor_line after move: 0

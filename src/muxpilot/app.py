@@ -374,6 +374,13 @@ class MuxpilotApp(App[str | None]):
                 break
             self.notify(msg, timeout=5)
 
+    def get_system_commands(self, screen):
+        """コマンドパレットから Keys / Screenshot を除外する。"""
+        _EXCLUDED = {"Keys", "Screenshot"}
+        for command in super().get_system_commands(screen):
+            if command.title not in _EXCLUDED:
+                yield command
+
     async def on_unmount(self) -> None:
         """Clean up NotifyChannel on app exit."""
         await self._notify_channel.stop()
