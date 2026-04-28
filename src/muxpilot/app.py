@@ -11,6 +11,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Static, Input
 
 from muxpilot.models import TmuxTree, PaneStatus
+from muxpilot.notify_channel import NotifyChannel
 from muxpilot.tmux_client import TmuxClient
 from muxpilot.watcher import TmuxWatcher
 from muxpilot.widgets.detail_panel import DetailPanel
@@ -19,6 +20,7 @@ from muxpilot.widgets.tree_view import TmuxTreeView
 
 
 POLL_INTERVAL_SECONDS = 2.0
+NOTIFY_CHECK_INTERVAL = 0.5
 
 
 class MuxpilotApp(App[str | None]):
@@ -89,6 +91,7 @@ class MuxpilotApp(App[str | None]):
         self._navigate_to: str | None = None
         self._status_filter: set[PaneStatus] | None = None
         self._name_filter: str = ""
+        self._notify_channel = NotifyChannel()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -115,12 +118,15 @@ class MuxpilotApp(App[str | None]):
         # Set initial focus to the tree to avoid the hidden input capturing keys
         self.query_one("#tmux-tree").focus()
 
+        await self._notify_channel.start()
+        self.set_interval(NOTIFY_CHECK_INTERVAL, self._check_notifications)
+
     async def _do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
         try:
             tree, events = await asyncio.to_thread(self._watcher.poll)
         except Exception as e:
-            self.notify(f"Error fetching tmux info: {e}", severity="error")
+            self._notify_channel.send(f"Error fetching tmux info: {e}")
             return
 
         # Update current pane ID from the tree's active pane
@@ -144,7 +150,7 @@ class MuxpilotApp(App[str | None]):
         # Show events as notifications
         for event in events:
             status_bar.show_event(event)
-            self.notify(event.message, timeout=5)
+            self._notify_channel.send(event.message)
 
     async def _poll_tmux(self) -> None:
         """Periodic polling callback."""
@@ -169,7 +175,7 @@ class MuxpilotApp(App[str | None]):
 
             for event in events:
                 status_bar.show_event(event)
-                self.notify(event.message, timeout=5)
+                self._notify_channel.send(event.message)
 
     def on_tmux_tree_view_node_info(self, message: TmuxTreeView.NodeInfo) -> None:
         """Handle node highlight → update detail panel."""
@@ -187,7 +193,7 @@ class MuxpilotApp(App[str | None]):
 
         # Don't navigate to our own pane
         if pane_id == self._current_pane_id:
-            self.notify("This is the current pane", severity="warning")
+            self._notify_channel.send("This is the current pane")
             return
 
         success = self._client.navigate_to(pane_id)
@@ -196,23 +202,19 @@ class MuxpilotApp(App[str | None]):
             # and we are not in an async context where create_task is appropriate without a loop.
             # Instead, we can use self.call_later or just rely on the polling.
             # But since we want it immediate, let's use self.set_interval or just trigger refresh.
-            self.notify(f"Navigated to {pane_id}")
+            self._notify_channel.send(f"Navigated to {pane_id}")
             asyncio.run_coroutine_threadsafe(self._do_refresh(), asyncio.get_event_loop())
         else:
-            self.notify(f"Failed to navigate to {pane_id}", severity="error")
+            self._notify_channel.send(f"Failed to navigate to {pane_id}")
 
     async def action_refresh(self) -> None:
         """Manual refresh (r key)."""
         await self._do_refresh()
-        self.notify("Refreshed", timeout=2)
+        self._notify_channel.send("Refreshed")
 
     def action_help(self) -> None:
         """Show help (? key)."""
-        self.notify(
-            "j/k: Navigate  Enter: Go to pane  r: Refresh  "
-            "/: Filter  e: Errors  w: Waiting  a: All  q: Quit",
-            timeout=10,
-        )
+        self._notify_channel.send("j/k: Navigate  Enter: Go to pane  r: Refresh  /: Filter  e: Errors  w: Waiting  a: All  q: Quit")
 
     async def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
@@ -241,20 +243,20 @@ class MuxpilotApp(App[str | None]):
         """Filter to show only error panes (e key)."""
         if self._status_filter == {PaneStatus.ERROR}:
             self._status_filter = None
-            self.notify("Error filter removed", timeout=2)
+            self._notify_channel.send("Error filter removed")
         else:
             self._status_filter = {PaneStatus.ERROR}
-            self.notify("Filtering by errors", timeout=2)
+            self._notify_channel.send("Filtering by errors")
         await self._do_refresh()
 
     async def action_filter_waiting(self) -> None:
         """Filter to show only waiting panes (w key)."""
         if self._status_filter == {PaneStatus.WAITING_INPUT}:
             self._status_filter = None
-            self.notify("Waiting filter removed", timeout=2)
+            self._notify_channel.send("Waiting filter removed")
         else:
             self._status_filter = {PaneStatus.WAITING_INPUT}
-            self.notify("Filtering by waiting", timeout=2)
+            self._notify_channel.send("Filtering by waiting")
         await self._do_refresh()
 
     async def action_filter_all(self) -> None:
@@ -264,8 +266,20 @@ class MuxpilotApp(App[str | None]):
         filter_input = self.query_one("#filter-input", Input)
         filter_input.value = ""
         filter_input.remove_class("-active")
-        self.notify("All filters cleared", timeout=2)
+        self._notify_channel.send("All filters cleared")
         await self._do_refresh()
+
+    async def _check_notifications(self) -> None:
+        """Consume messages from NotifyChannel and display as Textual notifications."""
+        while True:
+            msg = self._notify_channel.receive()
+            if msg is None:
+                break
+            self.notify(msg, timeout=5)
+
+    async def on_unmount(self) -> None:
+        """Clean up NotifyChannel on app exit."""
+        await self._notify_channel.stop()
 
 
 def main() -> None:

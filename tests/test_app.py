@@ -10,7 +10,7 @@ from muxpilot.models import PaneStatus
 from muxpilot.app import MuxpilotApp
 from muxpilot.widgets.tree_view import TmuxTreeView
 
-from conftest import make_mock_client, make_pane, make_session, make_tree, make_window
+from conftest import make_mock_client, make_mock_notify_channel, make_pane, make_session, make_tree, make_window
 
 
 def _patched_app(tree=None, current_pane_id=None):
@@ -20,6 +20,7 @@ def _patched_app(tree=None, current_pane_id=None):
     app._client = mock_client
     from muxpilot.watcher import TmuxWatcher
     app._watcher = TmuxWatcher(mock_client)
+    app._notify_channel = make_mock_notify_channel()
     return app
 
 
@@ -76,7 +77,7 @@ async def test_navigate_self_shows_warning():
 async def test_navigate_to_pane():
     """Activating a different pane should call navigate_to with that pane ID."""
     tree = make_tree(sessions=[
-        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
     app = _patched_app(tree=tree, current_pane_id="%99")
     async with app.run_test():
@@ -246,3 +247,26 @@ async def test_cursor_preserved_after_repopulate():
             assert before_path == after_path, (
                 f"Cursor path changed after repopulate: {before_path!r} → {after_path!r}"
             )
+
+
+@pytest.mark.asyncio
+async def test_notify_channel_started_on_mount():
+    """on_mount で NotifyChannel.start() が呼ばれること。"""
+    app = _patched_app()
+    async with app.run_test():
+        app._notify_channel.start.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_events_sent_through_notify_channel():
+    """リフレッシュ時に NotifyChannel.send() 経由で通知されること。"""
+    tree = make_tree()
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app.query_one("#tmux-tree").focus()
+        await pilot.press("r")
+        assert any(
+            call.args[0] == "Refreshed"
+            for call in app._notify_channel.send.call_args_list
+            if call.args
+        )
