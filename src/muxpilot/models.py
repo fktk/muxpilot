@@ -41,6 +41,7 @@ class PaneInfo:
     height: int
     status: PaneStatus = PaneStatus.UNKNOWN
     is_self: bool = False
+    custom_label: str = ""
 
     @property
     def display_label(self) -> str:
@@ -49,6 +50,9 @@ class PaneInfo:
 
         if self.is_self:
             return f"{icon} [muxpilot]"
+
+        if self.custom_label:
+            return f"{icon} {self.custom_label}"
 
         # パスを親ディレクトリとディレクトリ名の2階層に短縮
         path = self.current_path
@@ -70,10 +74,13 @@ class WindowInfo:
     window_index: int
     is_active: bool
     panes: list[PaneInfo] = field(default_factory=list)
+    custom_label: str = ""
 
     @property
     def display_label(self) -> str:
         """Label for tree view display."""
+        if self.custom_label:
+            return f"🪟 {self.custom_label}"
         active = " *" if self.is_active else ""
         return f"🪟 {self.window_index}: {self.window_name}{active}"
 
@@ -86,10 +93,13 @@ class SessionInfo:
     session_id: str
     is_attached: bool
     windows: list[WindowInfo] = field(default_factory=list)
+    custom_label: str = ""
 
     @property
     def display_label(self) -> str:
         """Label for tree view display."""
+        if self.custom_label:
+            return f"📦 {self.custom_label}"
         attached = " (attached)" if self.is_attached else ""
         return f"📦 {self.session_name}{attached}"
 
