@@ -33,3 +33,46 @@ class TestSendReceive:
         assert ch.receive() == "second"
         assert ch.receive() == "third"
         assert ch.receive() is None
+
+
+class TestFifoLifecycle:
+    """FIFO creation and cleanup."""
+
+    @pytest.mark.asyncio
+    async def test_start_creates_fifo(self, tmp_path):
+        """start() で FIFO ファイルが作成される。"""
+        import stat
+
+        fifo = tmp_path / "notify"
+        ch = NotifyChannel(fifo_path=fifo)
+        await ch.start()
+        try:
+            assert fifo.exists()
+            assert stat.S_ISFIFO(fifo.stat().st_mode)
+        finally:
+            await ch.stop()
+
+    @pytest.mark.asyncio
+    async def test_stop_removes_fifo(self, tmp_path):
+        """stop() で FIFO ファイルが削除される。"""
+        fifo = tmp_path / "notify"
+        ch = NotifyChannel(fifo_path=fifo)
+        await ch.start()
+        await ch.stop()
+        assert not fifo.exists()
+
+    @pytest.mark.asyncio
+    async def test_start_replaces_existing_fifo(self, tmp_path):
+        """既存 FIFO がある場合、削除して再作成する。"""
+        import os
+        import stat
+
+        fifo = tmp_path / "notify"
+        os.mkfifo(fifo)
+        ch = NotifyChannel(fifo_path=fifo)
+        await ch.start()
+        try:
+            assert fifo.exists()
+            assert stat.S_ISFIFO(fifo.stat().st_mode)
+        finally:
+            await ch.stop()
