@@ -1,28 +1,32 @@
 import pytest
-from unittest.mock import patch, mock_open
+from pathlib import Path
+from unittest.mock import MagicMock
 from muxpilot.watcher import TmuxWatcher
-from muxpilot.tmux_client import TmuxClient
 
-@patch("tomllib.load")
-@patch("builtins.open", new_callable=mock_open, read_data="""
-[watcher]
-prompt_patterns = ["^CustomPrompt>\\s*$"]
-error_patterns = ["CustomCriticalError"]
-""")
-def test_watcher_config_loading(mock_file, mock_toml):
-    mock_toml.return_value = {
-        "watcher": {
-            "prompt_patterns": ["^CustomPrompt>\\s*$"],
-            "error_patterns": ["CustomCriticalError"]
-        }
-    }
-    client = TmuxClient() # Simplified for test
-    watcher = TmuxWatcher(client)
+def test_load_watcher_config(tmp_path):
+    # Setup
+    config_dir = tmp_path / ".config/muxpilot"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.toml"
     
-    # Check if patterns are merged
-    # Default prompt patterns length: 7 (as per src/muxpilot/watcher.py)
-    # Default error patterns length: 7
-    assert len(watcher.prompt_patterns) == 8
-    assert len(watcher.error_patterns) == 8
-    assert watcher.prompt_patterns[-1].pattern == "^CustomPrompt>\\s*$"
-    assert watcher.error_patterns[-1].pattern == "CustomCriticalError"
+    # TOML literal string to avoid any backslash issue
+    config_content = """
+[watcher]
+prompt_patterns = ["^$ ", "^> "]
+error_patterns = ["Error:.*"]
+"""
+    config_file.write_text(config_content)
+    
+    # Mock home directory
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr("pathlib.Path.home", lambda: tmp_path)
+        
+        client = MagicMock()
+        watcher = TmuxWatcher(client)
+        
+        # Verify patterns are loaded
+        assert len(watcher.prompt_patterns) == 2
+        assert len(watcher.error_patterns) == 1
+        assert watcher.prompt_patterns[0].pattern == "^$ "
+        assert watcher.prompt_patterns[1].pattern == "^> "
+        assert watcher.error_patterns[0].pattern == "Error:.*"
