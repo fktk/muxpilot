@@ -81,6 +81,7 @@ class NotifyChannel:
         import select
         import errno
         
+        fd: int | None = None
         try:
             # Open with non-blocking to avoid indefinite block before writer connects
             try:
@@ -91,24 +92,25 @@ class NotifyChannel:
                     return None
                 raise
             
-            try:
-                # Use select to wait for data with timeout
-                ready, _, _ = select.select([fd], [], [], 0.5)
-                if not ready:
-                    return None
-                
-                # Data is available, read it
-                with os.fdopen(fd, "r") as f:
-                    for line in f:
-                        stripped = line.rstrip("\n")
-                        if stripped:
-                            return stripped
-            except Exception:
-                try:
-                    os.close(fd)
-                except Exception:
-                    pass
-                raise
+            # Use select to wait for data with timeout
+            ready, _, _ = select.select([fd], [], [], 0.5)
+            if not ready:
+                return None
+            
+            # Data is available, read it
+            # fdopen takes ownership of the fd and will close it
+            with os.fdopen(fd, "r") as f:
+                fd = None  # fd is now managed by f
+                for line in f:
+                    stripped = line.rstrip("\n")
+                    if stripped:
+                        return stripped
         except (OSError, FileNotFoundError):
             pass
+        finally:
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
         return None
