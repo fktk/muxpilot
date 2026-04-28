@@ -82,6 +82,28 @@ class TestPaneInfoDisplayLabel:
         pane = make_pane(is_self=False, current_path="/home/user/project")
         assert "muxpilot" not in pane.display_label
 
+    def test_display_label_with_custom_label(self) -> None:
+        """When custom_label is set, display_label should return icon + custom_label."""
+        pane = make_pane(status=PaneStatus.ACTIVE, custom_label="my runner")
+        icon = STATUS_ICONS[PaneStatus.ACTIVE]
+        assert pane.display_label == f"{icon} my runner"
+
+    def test_display_label_custom_label_empty_uses_default(self) -> None:
+        """When custom_label is empty, display_label should fall back to default."""
+        pane = make_pane(
+            current_command="vim",
+            current_path="/home/user/project",
+            status=PaneStatus.IDLE,
+            custom_label="",
+        )
+        assert "[vim]" in pane.display_label
+
+    def test_display_label_self_pane_ignores_custom_label(self) -> None:
+        """Self pane should always show [muxpilot] regardless of custom_label."""
+        pane = make_pane(is_self=True, custom_label="something else")
+        assert "muxpilot" in pane.display_label
+        assert "something else" not in pane.display_label
+
 
 # ============================================================================
 # WindowInfo.display_label
@@ -103,6 +125,17 @@ class TestWindowInfoDisplayLabel:
         assert "logs" in window.display_label
         assert "*" not in window.display_label
 
+    def test_display_label_with_custom_label(self) -> None:
+        """When custom_label is set, display_label should return it."""
+        window = make_window(window_name="editor", is_active=True, custom_label="My Editor")
+        assert window.display_label == "🪟 My Editor"
+
+    def test_display_label_custom_label_empty_uses_default(self) -> None:
+        """When custom_label is empty, display_label should use default format."""
+        window = make_window(window_name="editor", window_index=1, is_active=True, custom_label="")
+        assert "1: editor" in window.display_label
+        assert "*" in window.display_label
+
 
 # ============================================================================
 # SessionInfo.display_label
@@ -123,6 +156,17 @@ class TestSessionInfoDisplayLabel:
         session = make_session(session_name="work", is_attached=False)
         assert "work" in session.display_label
         assert "(attached)" not in session.display_label
+
+    def test_display_label_with_custom_label(self) -> None:
+        """When custom_label is set, display_label should return it."""
+        session = make_session(session_name="work", is_attached=True, custom_label="🚀 Main")
+        assert session.display_label == "📦 🚀 Main"
+
+    def test_display_label_custom_label_empty_uses_default(self) -> None:
+        """When custom_label is empty, display_label should use default format."""
+        session = make_session(session_name="work", is_attached=True, custom_label="")
+        assert "work" in session.display_label
+        assert "(attached)" in session.display_label
 
 
 # ============================================================================

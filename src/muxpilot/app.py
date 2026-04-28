@@ -10,6 +10,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Static, Input
 
+from muxpilot.label_store import LabelStore
 from muxpilot.models import TmuxTree, PaneStatus
 from muxpilot.notify_channel import NotifyChannel
 from muxpilot.tmux_client import TmuxClient
@@ -64,6 +65,16 @@ class MuxpilotApp(App[str | None]):
         display: block;
     }
 
+    #rename-input {
+        dock: top;
+        display: none;
+        margin-bottom: 1;
+    }
+
+    #rename-input.-active {
+        display: block;
+    }
+
     #no-tmux-message {
         width: 100%;
         height: 100%;
@@ -81,6 +92,7 @@ class MuxpilotApp(App[str | None]):
         Binding("e", "filter_errors", "Errors only"),
         Binding("w", "filter_waiting", "Waiting only"),
         Binding("c", "filter_all", "Show all"),
+        Binding("n", "rename", "Rename"),
     ]
 
     def __init__(self) -> None:
@@ -92,12 +104,15 @@ class MuxpilotApp(App[str | None]):
         self._status_filter: set[PaneStatus] | None = None
         self._name_filter: str = ""
         self._notify_channel = NotifyChannel()
+        self._label_store = LabelStore()
+        self._rename_key: str | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="main-container"):
             with Vertical(id="tree-panel"):
                 yield Input(placeholder="Filter by name...", id="filter-input")
+                yield Input(placeholder="New name (empty to reset)...", id="rename-input")
                 yield TmuxTreeView(id="tmux-tree")
             yield DetailPanel(id="detail-panel")
         yield StatusBar(id="status-bar")
@@ -121,6 +136,23 @@ class MuxpilotApp(App[str | None]):
         await self._notify_channel.start()
         self.set_interval(NOTIFY_CHECK_INTERVAL, self._check_notifications)
 
+    def _apply_labels(self, tree: TmuxTree) -> None:
+        """Apply custom labels from LabelStore to the tree snapshot."""
+        for session in tree.sessions:
+            label = self._label_store.get(session.session_name)
+            if label:
+                session.custom_label = label
+            for window in session.windows:
+                key = f"{session.session_name}.{window.window_index}"
+                label = self._label_store.get(key)
+                if label:
+                    window.custom_label = label
+                for pane in window.panes:
+                    key = f"{session.session_name}.{window.window_index}.{pane.pane_index}"
+                    label = self._label_store.get(key)
+                    if label:
+                        pane.custom_label = label
+
     async def _do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
         try:
@@ -128,6 +160,8 @@ class MuxpilotApp(App[str | None]):
         except Exception as e:
             self._notify_channel.send(f"Error fetching tmux info: {e}")
             return
+
+        self._apply_labels(tree)
 
         # Update current pane ID from the tree's active pane
         active_pane = next((p for s in tree.sessions for w in s.windows for p in w.panes if p.is_active), None)
@@ -159,6 +193,8 @@ class MuxpilotApp(App[str | None]):
             tree, events = await asyncio.to_thread(self._watcher.poll)
         except Exception:
             return
+
+        self._apply_labels(tree)
 
         # Update status bar
         status_bar = self.query_one("#status-bar", StatusBar)
@@ -216,7 +252,7 @@ class MuxpilotApp(App[str | None]):
 
     def action_help(self) -> None:
         """Show help (? key)."""
-        self._notify_channel.send("j/k: Navigate  Enter: Go to pane  r: Refresh  /: Filter  e: Errors  w: Waiting  c: Clear filters  a: Collapse/Expand all  q: Quit")
+        self._notify_channel.send("j/k: Navigate  Enter: Go to pane  r: Refresh  /: Filter  e: Errors  w: Waiting  c: Clear filters  a: Collapse/Expand all  n: Rename  q: Quit")
 
     async def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
@@ -225,10 +261,11 @@ class MuxpilotApp(App[str | None]):
             await self._do_refresh()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Handle Enter key in filter input."""
+        """Handle Enter key in filter or rename input."""
         if event.input.id == "filter-input":
-            # Return focus to tree
             self.query_one("#tmux-tree").focus()
+        elif event.input.id == "rename-input":
+            self._finish_rename(event.value)
 
     def action_filter(self) -> None:
         """Open filter input (/ key)."""
@@ -270,6 +307,64 @@ class MuxpilotApp(App[str | None]):
         filter_input.remove_class("-active")
         self._notify_channel.send("All filters cleared")
         await self._do_refresh()
+
+    async def action_rename(self) -> None:
+        """Start renaming the currently selected tree node (n key)."""
+        tw = self.query_one("#tmux-tree", TmuxTreeView)
+        node = tw.cursor_node
+        if node is None or node == tw.root:
+            return
+
+        data = tw._node_data.get(node.id)
+        if not data:
+            return
+
+        node_type, session, window, pane = data
+
+        if node_type == "session" and session:
+            self._rename_key = session.session_name
+        elif node_type == "window" and session and window:
+            self._rename_key = f"{session.session_name}.{window.window_index}"
+        elif node_type == "pane" and session and window and pane:
+            self._rename_key = f"{session.session_name}.{window.window_index}.{pane.pane_index}"
+        else:
+            return
+
+        rename_input = self.query_one("#rename-input", Input)
+        rename_input.value = self._label_store.get(self._rename_key)
+        rename_input.add_class("-active")
+        rename_input.focus()
+
+    def _finish_rename(self, value: str) -> None:
+        """Save the rename and close the input."""
+        if self._rename_key is not None:
+            if value:
+                self._label_store.set(self._rename_key, value)
+            else:
+                self._label_store.delete(self._rename_key)
+            self._rename_key = None
+
+        rename_input = self.query_one("#rename-input", Input)
+        rename_input.value = ""
+        rename_input.remove_class("-active")
+        self.query_one("#tmux-tree").focus()
+        asyncio.ensure_future(self._do_refresh())
+
+    def _cancel_rename(self) -> None:
+        """Cancel rename without saving."""
+        self._rename_key = None
+        rename_input = self.query_one("#rename-input", Input)
+        rename_input.value = ""
+        rename_input.remove_class("-active")
+        self.query_one("#tmux-tree").focus()
+
+    def on_key(self, event) -> None:
+        """Handle Escape key during rename."""
+        rename_input = self.query_one("#rename-input", Input)
+        if event.key == "escape" and rename_input.has_class("-active"):
+            self._cancel_rename()
+            event.prevent_default()
+            event.stop()
 
     async def _check_notifications(self) -> None:
         """Consume messages from NotifyChannel and display as Textual notifications."""

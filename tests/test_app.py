@@ -13,7 +13,7 @@ from muxpilot.widgets.tree_view import TmuxTreeView
 from conftest import make_mock_client, make_mock_notify_channel, make_pane, make_session, make_tree, make_window
 
 
-def _patched_app(tree=None, current_pane_id=None):
+def _patched_app(tree=None, current_pane_id=None, label_store=None):
     """Create a MuxpilotApp with a mocked TmuxClient/Watcher."""
     mock_client = make_mock_client(tree=tree, current_pane_id=current_pane_id)
     app = MuxpilotApp()
@@ -21,6 +21,8 @@ def _patched_app(tree=None, current_pane_id=None):
     from muxpilot.watcher import TmuxWatcher
     app._watcher = TmuxWatcher(mock_client)
     app._notify_channel = make_mock_notify_channel()
+    if label_store is not None:
+        app._label_store = label_store
     return app
 
 
@@ -434,3 +436,170 @@ async def test_events_sent_through_notify_channel():
             for call in app._notify_channel.send.call_args_list
             if call.args
         )
+
+
+# ============================================================================
+# Custom labels: applied on refresh
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_labels_applied_on_refresh(tmp_path):
+    """Custom labels from LabelStore should appear in the tree after refresh."""
+    from muxpilot.label_store import LabelStore
+    store = LabelStore(config_path=tmp_path / "config.toml")
+
+    tree = make_tree(sessions=[
+        make_session(session_name="work", session_id="$0", windows=[
+            make_window(window_name="editor", window_index=0, panes=[
+                make_pane(pane_id="%0", pane_index=0),
+            ])
+        ])
+    ])
+    app = _patched_app(tree=tree, label_store=store)
+    async with app.run_test() as pilot:
+        app._label_store.set("work", "🚀 Main Project")
+        await app.action_refresh()
+        await pilot.pause()
+
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        for node_id, (node_type, session, window, pane) in tw._node_data.items():
+            if node_type == "session" and session:
+                assert session.custom_label == "🚀 Main Project"
+
+
+# ============================================================================
+# Custom labels: rename action (n key)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_rename_key_shows_input(tmp_path):
+    """Pressing n should show the rename input."""
+    from textual.widgets import Input
+    from muxpilot.label_store import LabelStore
+
+    tree = make_tree(sessions=[
+        make_session(session_name="work", windows=[
+            make_window(window_name="editor", panes=[make_pane(pane_id="%0")])
+        ])
+    ])
+    store = LabelStore(config_path=tmp_path / "config.toml")
+    app = _patched_app(tree=tree, label_store=store)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")  # session
+        await pilot.press("j")  # window
+        await pilot.press("j")  # pane
+        await pilot.pause()
+
+        await app.action_rename()
+        await pilot.pause()
+
+        ri = app.query_one("#rename-input", Input)
+        assert ri.has_class("-active")
+
+
+@pytest.mark.asyncio
+async def test_rename_submit_saves_label(tmp_path):
+    """Submitting a name in rename input should save it via LabelStore."""
+    from textual.widgets import Input
+    from muxpilot.label_store import LabelStore
+
+    tree = make_tree(sessions=[
+        make_session(session_name="work", session_id="$0", windows=[
+            make_window(window_name="editor", window_index=0, panes=[
+                make_pane(pane_id="%0", pane_index=0),
+            ])
+        ])
+    ])
+    store = LabelStore(config_path=tmp_path / "config.toml")
+    app = _patched_app(tree=tree, label_store=store)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        await app.action_rename()
+        await pilot.pause()
+
+        ri = app.query_one("#rename-input", Input)
+        ri.value = "my test runner"
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert store.get("work.0.0") == "my test runner"
+
+
+@pytest.mark.asyncio
+async def test_rename_empty_deletes_label(tmp_path):
+    """Submitting empty string should delete the custom label."""
+    from textual.widgets import Input
+    from muxpilot.label_store import LabelStore
+
+    tree = make_tree(sessions=[
+        make_session(session_name="work", session_id="$0", windows=[
+            make_window(window_name="editor", window_index=0, panes=[
+                make_pane(pane_id="%0", pane_index=0),
+            ])
+        ])
+    ])
+    store = LabelStore(config_path=tmp_path / "config.toml")
+    store.set("work.0.0", "old label")
+    app = _patched_app(tree=tree, label_store=store)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        await app.action_rename()
+        await pilot.pause()
+
+        ri = app.query_one("#rename-input", Input)
+        ri.value = ""
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert store.get("work.0.0") == ""
+
+
+@pytest.mark.asyncio
+async def test_rename_escape_cancels(tmp_path):
+    """Pressing Escape during rename should cancel without saving."""
+    from textual.widgets import Input
+    from muxpilot.label_store import LabelStore
+
+    tree = make_tree(sessions=[
+        make_session(session_name="work", session_id="$0", windows=[
+            make_window(window_name="editor", window_index=0, panes=[
+                make_pane(pane_id="%0", pane_index=0),
+            ])
+        ])
+    ])
+    store = LabelStore(config_path=tmp_path / "config.toml")
+    app = _patched_app(tree=tree, label_store=store)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        await app.action_rename()
+        await pilot.pause()
+
+        ri = app.query_one("#rename-input", Input)
+        ri.value = "should not save"
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert store.get("work.0.0") == ""
+        assert not ri.has_class("-active")

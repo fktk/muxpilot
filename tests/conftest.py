@@ -25,6 +25,7 @@ def make_pane(
     height: int = 24,
     status: PaneStatus = PaneStatus.UNKNOWN,
     is_self: bool = False,
+    custom_label: str = "",
 ) -> PaneInfo:
     """Create a PaneInfo with sensible defaults."""
     return PaneInfo(
@@ -37,6 +38,7 @@ def make_pane(
         height=height,
         status=status,
         is_self=is_self,
+        custom_label=custom_label,
     )
 
 
@@ -46,6 +48,7 @@ def make_window(
     window_index: int = 0,
     is_active: bool = True,
     panes: list[PaneInfo] | None = None,
+    custom_label: str = "",
 ) -> WindowInfo:
     """Create a WindowInfo with sensible defaults."""
     if panes is None:
@@ -56,6 +59,7 @@ def make_window(
         window_index=window_index,
         is_active=is_active,
         panes=panes,
+        custom_label=custom_label,
     )
 
 
@@ -64,6 +68,7 @@ def make_session(
     session_id: str = "$0",
     is_attached: bool = True,
     windows: list[WindowInfo] | None = None,
+    custom_label: str = "",
 ) -> SessionInfo:
     """Create a SessionInfo with sensible defaults."""
     if windows is None:
@@ -73,6 +78,7 @@ def make_session(
         session_id=session_id,
         is_attached=is_attached,
         windows=windows,
+        custom_label=custom_label,
     )
 
 
