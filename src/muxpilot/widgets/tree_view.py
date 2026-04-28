@@ -99,7 +99,10 @@ class TmuxTreeView(Tree[str]):
             nodes_to_check.extend(node.children)
 
         if target_cursor_node:
-            self.move_cursor(target_cursor_node)
+            # Defer until after rendering: newly added nodes have _line == -1
+            # until the tree renders, so move_cursor() would snap to line -1
+            # (top) if called synchronously here.
+            self.call_after_refresh(self.move_cursor, target_cursor_node)
 
     def populate(
         self,

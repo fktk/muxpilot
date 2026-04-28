@@ -191,3 +191,58 @@ async def test_filter_all_clears():
         assert app._name_filter == ""
         fi = app.query_one("#filter-input", Input)
         assert not fi.has_class("-active")
+
+
+# ============================================================================
+# Cursor preservation: populate() must not reset cursor position
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_cursor_preserved_after_repopulate():
+    """Calling populate() again (e.g., on status events) must not reset cursor.
+
+    This is a regression test for the bug where node._line == -1 on newly
+    added nodes caused move_cursor() to snap the view to line -1 (top).
+    """
+    tree = make_tree(sessions=[
+        make_session(session_id="$0", session_name="s0", windows=[
+            make_window(window_id="@0", panes=[
+                make_pane(pane_id="%0", is_active=False),
+                make_pane(pane_id="%1", is_active=False),
+                make_pane(pane_id="%2", is_active=False),
+            ])
+        ])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+
+        # Navigate cursor down to %2 (third pane)
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        cursor_before = tw.cursor_node
+
+        # Simulate a poll-triggered repopulate (same tree content)
+        tw.populate(tree, current_pane_id=None)
+        # Wait two render cycles so call_after_refresh fires
+        await pilot.pause()
+        await pilot.pause()
+
+        cursor_after = tw.cursor_node
+
+        # Cursor must not have been reset to root/first node
+        assert cursor_after is not None
+        assert cursor_after != tw.root, "Cursor was reset to root after repopulate"
+        # The cursor path (pane id) must match
+        if cursor_before is not None:
+            before_data = tw._node_data.get(cursor_before.id if cursor_before in [tw.root] else cursor_after.id)
+            # Verify cursor is on the same path as before repopulate
+            before_path = tw._get_node_path(cursor_before) if cursor_before else None
+            after_path = tw._get_node_path(cursor_after) if cursor_after else None
+            assert before_path == after_path, (
+                f"Cursor path changed after repopulate: {before_path!r} → {after_path!r}"
+            )
