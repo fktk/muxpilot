@@ -76,3 +76,41 @@ class TestFifoLifecycle:
             assert stat.S_ISFIFO(fifo.stat().st_mode)
         finally:
             await ch.stop()
+
+
+class TestFifoRead:
+    """Reading messages through FIFO from external writers."""
+
+    @pytest.mark.asyncio
+    async def test_fifo_message_reaches_queue(self, tmp_path):
+        """FIFO に書き込んだメッセージが receive() で取得できる。"""
+        fifo = tmp_path / "notify"
+        ch = NotifyChannel(fifo_path=fifo)
+        await ch.start()
+        try:
+            def write_fifo():
+                with open(fifo, "w") as f:
+                    f.write("外部からの通知\n")
+
+            await asyncio.to_thread(write_fifo)
+            await asyncio.sleep(0.5)
+            assert ch.receive() == "外部からの通知"
+        finally:
+            await ch.stop()
+
+    @pytest.mark.asyncio
+    async def test_fifo_multiple_lines(self, tmp_path):
+        """FIFO に複数行書き込むと先頭の非空行だけが1回の open で読まれる。"""
+        fifo = tmp_path / "notify"
+        ch = NotifyChannel(fifo_path=fifo)
+        await ch.start()
+        try:
+            def write_fifo():
+                with open(fifo, "w") as f:
+                    f.write("msg1\n")
+
+            await asyncio.to_thread(write_fifo)
+            await asyncio.sleep(0.5)
+            assert ch.receive() == "msg1"
+        finally:
+            await ch.stop()

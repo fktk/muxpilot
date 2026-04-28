@@ -46,8 +46,8 @@ class NotifyChannel:
         if self._read_task is not None:
             self._read_task.cancel()
             try:
-                await self._read_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(self._read_task, timeout=1.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             self._read_task = None
         if self.fifo_path.exists():
@@ -67,6 +67,8 @@ class NotifyChannel:
                 line = await asyncio.to_thread(self._read_one_line)
                 if line is not None:
                     self._queue.put(line)
+                else:
+                    await asyncio.sleep(0.1)
             except asyncio.CancelledError:
                 break
             except Exception:
@@ -75,13 +77,38 @@ class NotifyChannel:
                     await asyncio.sleep(0.5)
 
     def _read_one_line(self) -> str | None:
-        """Blocking read of one line from FIFO. Returns None on EOF."""
+        """Blocking read of one line from FIFO. Returns None on timeout/EOF."""
+        import select
+        import errno
+        
         try:
-            with open(self.fifo_path, "r") as f:
-                for line in f:
-                    stripped = line.rstrip("\n")
-                    if stripped:
-                        return stripped
+            # Open with non-blocking to avoid indefinite block before writer connects
+            try:
+                fd = os.open(self.fifo_path, os.O_RDONLY | os.O_NONBLOCK)
+            except OSError as e:
+                if e.errno == errno.ENXIO:
+                    # FIFO exists but has no writer - normal state
+                    return None
+                raise
+            
+            try:
+                # Use select to wait for data with timeout
+                ready, _, _ = select.select([fd], [], [], 0.5)
+                if not ready:
+                    return None
+                
+                # Data is available, read it
+                with os.fdopen(fd, "r") as f:
+                    for line in f:
+                        stripped = line.rstrip("\n")
+                        if stripped:
+                            return stripped
+            except Exception:
+                try:
+                    os.close(fd)
+                except Exception:
+                    pass
+                raise
         except (OSError, FileNotFoundError):
             pass
         return None
