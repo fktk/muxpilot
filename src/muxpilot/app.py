@@ -87,7 +87,7 @@ class MuxpilotApp(App[str | None]):
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
         Binding("r", "refresh", "Refresh"),
-        Binding("question_mark", "help", "Help"),
+        Binding("question_mark", "help", "Help", show=False),
         Binding("slash", "filter", "Filter"),
         Binding("e", "filter_errors", "Errors only"),
         Binding("w", "filter_waiting", "Waiting only"),
