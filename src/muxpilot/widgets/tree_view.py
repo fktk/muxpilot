@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from rich.text import Text
 from textual.message import Message
 from textual.widgets import Tree
 from textual.widgets._tree import TreeNode
@@ -11,7 +12,7 @@ from textual.widgets._tree import TreeNode
 from muxpilot.models import PaneInfo, PaneStatus, SessionInfo, TmuxTree, WindowInfo
 
 
-class TmuxTreeView(Tree[str]):
+class TmuxTreeView(Tree[Text]):
     """A tree widget that displays the tmux session → window → pane hierarchy."""
 
     BINDINGS = [
@@ -44,13 +45,13 @@ class TmuxTreeView(Tree[str]):
         pane_info: PaneInfo | None = None
 
     def __init__(self, name: str | None = None, id: str | None = None) -> None:
-        super().__init__("tmux", name=name, id=id)
+        super().__init__(Text("tmux"), name=name, id=id)
         self._pane_map: dict[str, tuple[SessionInfo, WindowInfo, PaneInfo]] = {}
         self._node_data: dict[int, tuple[str, SessionInfo | None, WindowInfo | None, PaneInfo | None]] = {}
         self._expanded_paths: set[str] = set()
         self._selected_path: str | None = None
 
-    def _get_node_path(self, node: TreeNode[str]) -> str:
+    def _get_node_path(self, node: TreeNode[Text]) -> str:
         """Generate a unique string path for a node to preserve state."""
         data = self._node_data.get(node.id)
         if not data:
@@ -69,7 +70,7 @@ class TmuxTreeView(Tree[str]):
         self._expanded_paths.clear()
         
         # Save expanded nodes
-        nodes_to_check = [self.root]
+        nodes_to_check: list[TreeNode[Text]] = [self.root]
         while nodes_to_check:
             node = nodes_to_check.pop(0)
             if node.is_expanded and node != self.root:
@@ -86,7 +87,7 @@ class TmuxTreeView(Tree[str]):
 
     def _restore_state(self) -> None:
         """Restore the expanded state and selection."""
-        nodes_to_check = [self.root]
+        nodes_to_check: list[TreeNode[Text]] = [self.root]
         target_cursor_node = None
         
         while nodes_to_check:
@@ -154,25 +155,24 @@ class TmuxTreeView(Tree[str]):
             # If we have windows to add, or the session itself matches the filter, keep it
             if windows_to_add or (session_match and not status_filter):
                 session_node = self.root.add(
-                    session.display_label,
+                    Text.from_markup(session.display_label),
                     expand=True,
                 )
                 self._node_data[session_node.id] = ("session", session, None, None)
 
                 for window, panes in windows_to_add:
                     window_node = session_node.add(
-                        window.display_label,
+                        Text.from_markup(window.display_label),
                         expand=True,
                     )
                     self._node_data[window_node.id] = ("window", session, window, None)
 
                     for pane in panes:
-                        is_active = pane.is_active
-                        label = pane.display_label
-                        if is_active:
-                            label = f"➜ {label}"
+                        label_text = Text.from_markup(pane.display_label)
+                        if pane.is_active:
+                            label_text.stylize("bold reverse")
 
-                        pane_node = window_node.add_leaf(label)
+                        pane_node = window_node.add_leaf(label_text)
                         self._node_data[pane_node.id] = ("pane", session, window, pane)
                         self._pane_map[pane.pane_id] = (session, window, pane)
 
@@ -202,7 +202,7 @@ class TmuxTreeView(Tree[str]):
             else:
                 node.expand()
 
-    def on_tree_node_highlighted(self, event: Tree.NodeHighlighted[str]) -> None:
+    def on_tree_node_highlighted(self, event: Tree.NodeHighlighted[Text]) -> None:
         """When a node is highlighted, emit NodeInfo for the detail panel."""
         data = self._node_data.get(event.node.id)
         if data:
@@ -216,7 +216,7 @@ class TmuxTreeView(Tree[str]):
                 )
             )
 
-    def on_tree_node_selected(self, event: Tree.NodeSelected[str]) -> None:
+    def on_tree_node_selected(self, event: Tree.NodeSelected[Text]) -> None:
         """When a pane leaf node is selected (Enter), emit PaneActivated."""
         data = self._node_data.get(event.node.id)
         if data:
