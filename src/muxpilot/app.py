@@ -93,6 +93,7 @@ class MuxpilotApp(App[str | None]):
         Binding("w", "filter_waiting", "Waiting only"),
         Binding("c", "filter_all", "Show all"),
         Binding("n", "rename", "Rename"),
+        Binding("x", "kill_pane", "Kill pane"),
     ]
 
     def __init__(self) -> None:
@@ -106,6 +107,7 @@ class MuxpilotApp(App[str | None]):
         self._notify_channel = NotifyChannel()
         self._label_store = LabelStore()
         self._rename_key: str | None = None
+        self._kill_pane_id: str | None = None
         self.theme = self._label_store.get_theme()
 
     def watch_theme(self, theme: str) -> None:
@@ -364,8 +366,64 @@ class MuxpilotApp(App[str | None]):
         rename_input.remove_class("-active")
         self.query_one("#tmux-tree").focus()
 
+    def action_kill_pane(self) -> None:
+        """Start kill confirmation for the currently selected pane (x key)."""
+        tw = self.query_one("#tmux-tree", TmuxTreeView)
+        node = tw.cursor_node
+        if node is None or node == tw.root:
+            return
+
+        data = tw._node_data.get(node.id)
+        if not data:
+            return
+
+        node_type, session, window, pane = data
+        if node_type != "pane" or pane is None:
+            return
+
+        # Don't kill our own pane
+        if pane.pane_id == self._current_pane_id:
+            self._notify_channel.send("Cannot kill the current pane")
+            return
+
+        self._kill_pane_id = pane.pane_id
+        self._notify_channel.send(f"Kill pane {pane.pane_id}? (y/n)")
+
+    def _confirm_kill_pane(self) -> None:
+        """Execute the pending pane kill."""
+        if self._kill_pane_id is None:
+            return
+        pane_id = self._kill_pane_id
+        self._kill_pane_id = None
+
+        success = self._client.kill_pane(pane_id)
+        if success:
+            self._notify_channel.send(f"Killed pane {pane_id}")
+            asyncio.ensure_future(self._do_refresh())
+        else:
+            self._notify_channel.send(f"Failed to kill pane {pane_id}")
+
+    def _cancel_kill_pane(self) -> None:
+        """Cancel kill pane confirmation."""
+        if self._kill_pane_id is not None:
+            self._kill_pane_id = None
+            self._notify_channel.send("Kill cancelled")
+
     def on_key(self, event) -> None:
-        """Handle Escape key during rename."""
+        """Handle Escape key during rename or kill confirmation."""
+        # Kill confirmation mode
+        if self._kill_pane_id is not None:
+            if event.key in ("y", "enter"):
+                self._confirm_kill_pane()
+                event.prevent_default()
+                event.stop()
+            elif event.key in ("n", "escape"):
+                self._cancel_kill_pane()
+                event.prevent_default()
+                event.stop()
+            return
+
+        # Rename input escape
         rename_input = self.query_one("#rename-input", Input)
         if event.key == "escape" and rename_input.has_class("-active"):
             self._cancel_rename()

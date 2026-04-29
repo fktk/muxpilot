@@ -106,6 +106,17 @@ class TmuxClient:
         target_pane.select()
         return True
 
+    def kill_pane(self, pane_id: str) -> bool:
+        """Kill the specified pane."""
+        pane = self._find_pane(pane_id)
+        if pane is None:
+            return False
+        try:
+            pane.kill()
+            return True
+        except libtmux.exc.LibTmuxException:
+            return False
+
     def capture_pane_content(self, pane_id: str, lines: int = 50) -> list[str]:
         """Capture the last N lines of output from a pane."""
         pane = self._find_pane(pane_id)
