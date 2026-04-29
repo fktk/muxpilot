@@ -3,37 +3,41 @@
 ![muxpilot](https://img.shields.io/badge/status-active-success.svg)
 ![python](https://img.shields.io/badge/python-3.12+-blue.svg)
 
-**muxpilot** は、tmux のセッション・ウィンドウ・ペインを直感的にナビゲートするための TUI (Terminal User Interface) ツールです。
+**muxpilot** is a TUI (Terminal User Interface) tool for intuitively navigating tmux sessions, windows, and panes.
 
-特に **AIエージェントのオーケストレーション** や、複数ペインで同時に動くタスクの管理を想定して設計されています。ペインの出力を監視し、「コマンド実行中」「指示待ち」「エラー発生」などの状態を自動で推定・可視化します。
+It is designed specifically for **AI agent orchestration** and managing tasks running simultaneously across multiple panes. It monitors pane output and automatically estimates and visualizes states such as "command running," "waiting for input," and "error occurred."
 
-## ✨ 主な機能
+[日本語版 README はこちら](./README.ja.md)
 
-- **🌲 階層ツリー表示**: tmux の `Session -> Window -> Pane` 構造をツリー表示。
-- **⌨️ キーボードナビゲーション**: Vimライクなキーバインド (`j`/`k`) で素早くペイン間を移動。
-- **🔍 フィルタリング**: 
-  - `/`: 名前（セッション名、コマンド、パス等）による絞り込み
-  - `w`: 入力待ち（プロンプト表示中）のペインのみ抽出
-  - `e`: エラーが発生したペインのみ抽出
-  - `c`: フィルタを解除して全表示
-- **👀 ステータス監視**: 各ペインの出力を定期的にポーリングし、以下のステータスアイコンを自動付与します。
+## ✨ Features
 
-  | アイコン | ステータス | 検出条件 |
+- **🌲 Hierarchical Tree Display**: Displays the tmux `Session → Window → Pane` structure as a tree.
+- **⌨️ Keyboard Navigation**: Vim-like keybindings (`j`/`k`) for quickly moving between panes.
+- **🔍 Filtering**:
+  - `/`: Filter by name (session name, command, path, etc.)
+  - `w`: Extract only panes waiting for input (prompt displayed)
+  - `e`: Extract only panes with errors
+  - `c`: Clear filters and show all
+- **👀 Status Monitoring**: Periodically polls each pane's output and automatically assigns the following status icons:
+
+  | Icon | Status | Detection Condition |
   |:---:|---|---|
-  | `●` | ACTIVE | 今回のポーリングでペインの出力内容が変化した（コマンド実行中・ログ出力中など） |
-  | `◌` | IDLE | プロンプトではないが、出力が一定時間（デフォルト10秒）以上変化していない |
-  | `⏳` | WAITING | 最終行がプロンプトパターンに一致し、かつアイドル時間が閾値を超えている（ユーザーの入力待ち） |
-  | `🔴` | ERROR | 直近10行にエラーパターン（`Traceback`, `Error:`, `FAILED` 等）が検出された |
-  | `✅` | COMPLETED | 最終行がプロンプトパターンに一致し、かつアイドル時間が閾値以内（コマンドが完了した直後） |
+  | `●` | ACTIVE | Pane output changed since last poll (command running, log output, etc.) |
+  | `◌` | IDLE | Not a prompt, but output hasn't changed for more than a certain time (default 10 seconds) |
+  | `⏳` | WAITING | Last line matches a prompt pattern and idle time exceeds threshold (waiting for user input) |
+  | `🔴` | ERROR | Error pattern (`Traceback`, `Error:`, `FAILED`, etc.) detected in the last 10 lines |
+  | `✅` | COMPLETED | Last line matches a prompt pattern and idle time is within threshold (right after command completion) |
 
-  判定は **ERROR → COMPLETED / WAITING → IDLE → ACTIVE** の優先順で行われます。
-- **📋 詳細パネル**: 選択中のペイン内で実行されているコマンド、現在のディレクトリ、サイズなどの詳細情報を表示。
+  Status is determined in priority order: **ERROR → COMPLETED / WAITING → IDLE → ACTIVE**.
 
-## 🚀 インストール & 起動
+- **🏷️ Custom Labels**: Rename sessions, windows, and panes with the `n` key. Labels are persisted to `~/.config/muxpilot/config.toml`.
+- **📋 Detail Panel**: Displays detailed information about the selected pane, such as the running command, current directory, size, and status.
 
-Pythonのパッケージマネージャ [uv](https://docs.astral.sh/uv/) を使用して起動できます。
+## 🚀 Installation & Launch
 
-### ローカル開発環境での起動
+You can launch muxpilot using the Python package manager [uv](https://docs.astral.sh/uv/).
+
+### Launch in Local Development Environment
 
 ```bash
 git clone https://github.com/fktk/muxpilot.git
@@ -41,58 +45,76 @@ cd muxpilot
 uv run muxpilot
 ```
 
-### どこからでも一時実行 (uvx)
+### Run Anywhere Without Installation (uvx)
 
-インストール不要で、GitHubから直接実行することも可能です。
+You can also run it directly from GitHub without installation.
 
 ```bash
 uvx --from git+https://github.com/fktk/muxpilot.git muxpilot
 ```
 
-## ⌨️ キーバインド
+## ⚙️ Configuration
 
-| キー | アクション |
-|------|-----------|
-| `↑` / `k` | カーソルを上に移動 |
-| `↓` / `j` | カーソルを下に移動 |
-| `Enter` | 選択したペインにジャンプ（muxpilot は裏で起動し続けます） |
-| `a` | すべてのノードを折り畳み / 展開（トグル） |
-| `r` | 情報の手動リフレッシュ |
-| `/` | フィルタ入力のオン/オフ |
-| `e` | エラー（🔴）ペインのみ表示 |
-| `w` | 指示待ち（⏳）ペインのみ表示 |
-| `c` | フィルタを解除して全表示 |
-| `?` | ヘルプを表示 |
-| `q` | 終了 |
+You can customize watcher behavior by creating `~/.config/muxpilot/config.toml`:
 
-## 💡 おすすめの使い方：ダッシュボード運用（司令塔）
-
-muxpilot は「**ダッシュボードとして常に起動させ続ける**」設計になっています。
-Enter キーを押して他のペインにジャンプしても、muxpilot 自体は終了せずに裏でモニタリングを継続します。
-
-**おすすめの画面構成**:
-tmux の画面を分割し、左側（または上部）に muxpilot を常駐させます。
-muxpilot から `Enter` で作業ペインに飛び、用事が済んだら tmux のショートカット（例: `Prefix + 左矢印` 等）で muxpilot のペインに戻ってくる、という司令塔のような使い方が最適です。
-
-## 🔔 トースト通知
-
-muxpilot は画面右上にトースト通知を表示します。ペインの追加・削除などの構造変化や、手動リフレッシュ時に自動で表示されます。
-
-### 外部からの通知
-
-muxpilot は FIFO（名前付きパイプ）`~/.muxpilot/notify` を監視しており、外部プロセスから任意のメッセージを送信できます。
-
-```bash
-echo "ビルド完了！" > ~/.muxpilot/notify
+```toml
+[watcher]
+prompt_patterns = ['[$>?]\s*$', 'In \[\d+\]: ']
+error_patterns = ['(?i)Error|Exception|Traceback|FAILED|panic|Segmentation fault|FATAL']
+idle_threshold = 10.0
 ```
 
-これにより、シェルスクリプトや CI ツールから muxpilot 上に通知を表示させることができます。
+- `prompt_patterns`: Regex list for detecting prompts. **Replaces** the default patterns entirely.
+- `error_patterns`: Regex list for detecting errors. **Replaces** the default patterns entirely.
+- `idle_threshold`: Seconds before a pane is considered idle.
 
-## 🛠 技術スタック
+See `config.example.toml` for more details.
 
-- [libtmux](https://libtmux.git-pull.com/) - tmux サーバーとの通信、階層データの取得、ペイン出力のキャプチャ
-- [Textual](https://textual.textualize.io/) - 高度なTUIコンポーネント、非同期イベントループによるUI描画とポーリング
+## ⌨️ Keybindings
+
+| Key | Action |
+|------|-----------|
+| `↑` / `k` | Move cursor up |
+| `↓` / `j` | Move cursor down |
+| `Enter` | Jump to selected pane (muxpilot continues running in the background) |
+| `a` | Collapse / expand all nodes (toggle) |
+| `r` | Manual refresh |
+| `/` | Toggle filter input on/off |
+| `e` | Show only error (🔴) panes |
+| `w` | Show only waiting (⏳) panes |
+| `c` | Clear filters and show all |
+| `n` | Rename the selected node (custom label) |
+| `?` | Show help |
+| `q` | Quit |
+
+## 💡 Recommended Usage: Dashboard Operation (Command Center)
+
+muxpilot is designed to be **kept running as a dashboard at all times**.
+Even when you press Enter to jump to another pane, muxpilot itself does not exit and continues monitoring in the background.
+
+**Recommended Screen Layout**:
+Split the tmux screen and keep muxpilot常驻 on the left (or top).
+The optimal usage is like a command center: jump from muxpilot to a working pane with `Enter`, and return to the muxpilot pane with tmux shortcuts (e.g., `Prefix + Left Arrow`).
+
+## 🔔 Toast Notifications
+
+muxpilot displays toast notifications in the upper right corner of the screen. These are automatically shown for structural changes such as pane additions/removals and during manual refresh.
+
+### External Notifications
+
+muxpilot monitors a FIFO (named pipe) at `~/.muxpilot/notify` and can receive arbitrary messages from external processes.
+
+```bash
+echo "Build complete!" > ~/.muxpilot/notify
+```
+
+This allows you to display notifications on muxpilot from shell scripts or CI tools.
+
+## 🛠 Tech Stack
+
+- [libtmux](https://libtmux.git-pull.com/) - Communication with tmux server, hierarchy data retrieval, pane output capture
+- [Textual](https://textual.textualize.io/) - Advanced TUI components, UI rendering and polling via asynchronous event loop
 
 ## 📄 License
 
-ライセンスは未設定です。
+License is not set.
