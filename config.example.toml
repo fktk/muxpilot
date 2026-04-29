@@ -1,0 +1,28 @@
+# muxpilot configuration example
+# Place this file at ~/.config/muxpilot/config.toml
+
+[watcher]
+# Prompt patterns (regular expressions)
+# Specifying these completely REPLACES the default patterns.
+# Uncomment and customize as needed.
+
+# Default prompt patterns are:
+#   '[$>?]\\s*$'          - shell prompt (bash/zsh etc.)
+#   'In \\[\\d+\\]: '     - IPython / Jupyter
+#   '(?i)\\(y/n\\)'       - Yes/No prompt (case-insensitive)
+
+# prompt_patterns = [
+#   '[$>?]\\s*$',
+#   'In \\[\\d+\\]: ',
+#   '(?i)\\(y/n\\)',
+# ]
+
+# Error patterns (regular expressions)
+# Specifying these completely REPLACES the default patterns.
+
+# Default error patterns are:
+#   '(?i)Error|Exception|Traceback|FAILED|panic|Segmentation fault|FATAL'
+
+# error_patterns = [
+#   '(?i)Error|Exception|Traceback|FAILED|panic|Segmentation fault|FATAL',
+# ]
