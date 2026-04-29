@@ -21,6 +21,7 @@ class TmuxClient:
 
     def __init__(self) -> None:
         self._server: libtmux.Server | None = None
+        self._pane_cache: dict[str, libtmux.Pane] = {}
 
     @property
     def server(self) -> libtmux.Server:
@@ -41,6 +42,7 @@ class TmuxClient:
         """Fetch the complete tmux session/window/pane hierarchy."""
         tree = TmuxTree(timestamp=time.time())
         self_pane_id = self.get_current_pane_id()
+        pane_cache: dict[str, libtmux.Pane] = {}
 
         for session in self.server.sessions:
             session_info = SessionInfo(
@@ -61,6 +63,8 @@ class TmuxClient:
 
                 for pane in window.panes:
                     pane_id = pane.pane_id or ""
+                    if pane_id:
+                        pane_cache[pane_id] = pane
                     pane_info = PaneInfo(
                         pane_id=pane_id,
                         pane_index=int(pane.pane_index or 0),
@@ -77,6 +81,10 @@ class TmuxClient:
                 session_info.windows.append(window_info)
 
             tree.sessions.append(session_info)
+
+        # Update pane cache so subsequent lookups (e.g. capture_pane) don't
+        # re-fetch the entire tree via N+1 tmux commands.
+        self._pane_cache = pane_cache
 
         return tree
 
@@ -155,7 +163,14 @@ class TmuxClient:
             return []
 
     def _find_pane(self, pane_id: str) -> libtmux.Pane | None:
-        """Find a pane object by its ID across all sessions."""
+        """Find a pane object by its ID across all sessions.
+
+        Uses a cache populated by get_tree() to avoid redundant tmux commands.
+        Falls back to a full server scan if the cache miss.
+        """
+        if pane_id in self._pane_cache:
+            return self._pane_cache[pane_id]
+
         for session in self.server.sessions:
             for window in session.windows:
                 for pane in window.panes:
