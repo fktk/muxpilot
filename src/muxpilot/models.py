@@ -49,7 +49,7 @@ class PaneInfo:
         icon = STATUS_ICONS.get(self.status, "?")
 
         if self.is_self:
-            return f"{icon} [muxpilot]"
+            return "🚀 muxpilot"
 
         if self.custom_label:
             return f"{icon} {self.custom_label}"

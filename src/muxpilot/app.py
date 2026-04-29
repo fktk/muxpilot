@@ -87,7 +87,7 @@ class MuxpilotApp(App[str | None]):
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
         Binding("r", "refresh", "Refresh"),
-        Binding("question_mark", "help", "Help"),
+        Binding("question_mark", "help", "Help", show=False),
         Binding("slash", "filter", "Filter"),
         Binding("e", "filter_errors", "Errors only"),
         Binding("w", "filter_waiting", "Waiting only"),
@@ -373,6 +373,13 @@ class MuxpilotApp(App[str | None]):
             if msg is None:
                 break
             self.notify(msg, timeout=5)
+
+    def get_system_commands(self, screen):
+        """コマンドパレットから Keys / Screenshot を除外する。"""
+        _EXCLUDED = {"Keys", "Screenshot"}
+        for command in super().get_system_commands(screen):
+            if command.title not in _EXCLUDED:
+                yield command
 
     async def on_unmount(self) -> None:
         """Clean up NotifyChannel on app exit."""
