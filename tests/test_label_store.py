@@ -85,6 +85,22 @@ class TestLabelStorePersistence:
         assert data["other"]["key"] == "value"
         assert data["labels"]["myproject"] == "label"
 
+    def test_theme_persistence(self, tmp_path: Path) -> None:
+        """Theme settings should persist across instances."""
+        config_path = tmp_path / "config.toml"
+        store = LabelStore(config_path=config_path)
+
+        # Default theme
+        assert store.get_theme() == "textual-dark"
+
+        # Set and save
+        store.set_theme("textual-light")
+        assert store.get_theme() == "textual-light"
+
+        # Reload from disk
+        store2 = LabelStore(config_path=config_path)
+        assert store2.get_theme() == "textual-light"
+
 
 class TestLabelStoreEdgeCases:
     """Edge case handling."""

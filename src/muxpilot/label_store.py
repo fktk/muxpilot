@@ -43,6 +43,15 @@ class LabelStore:
             del labels[key]
             self._save()
 
+    def get_theme(self) -> str:
+        """Return the stored theme or 'textual-dark' default."""
+        return self._data.get("app", {}).get("theme", "textual-dark")
+
+    def set_theme(self, theme: str) -> None:
+        """Set the theme and persist to disk."""
+        self._data.setdefault("app", {})["theme"] = theme
+        self._save()
+
     def _load(self) -> dict:
         if self._path.exists():
             with open(self._path, "rb") as f:

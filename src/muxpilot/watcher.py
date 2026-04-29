@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import pathlib
 import re
 import time
+import tomllib
 
 from muxpilot.models import (
     PaneActivity,
@@ -53,8 +56,32 @@ class TmuxWatcher:
         self.idle_threshold = idle_threshold
         self.capture_lines = capture_lines
         self.activities: dict[str, PaneActivity] = {}
+        
+        # Load default patterns
         self.prompt_patterns = list(DEFAULT_PROMPT_PATTERNS)
         self.error_patterns = list(DEFAULT_ERROR_PATTERNS)
+        
+        # Override with config if present
+        config_path = pathlib.Path.home() / ".config/muxpilot/config.toml"
+        if config_path.exists():
+            try:
+                with open(config_path, "rb") as f:
+                    config = tomllib.load(f)
+                    watcher_cfg = config.get("watcher", {})
+                    
+                    custom_prompts = watcher_cfg.get("prompt_patterns", [])
+                    if custom_prompts:
+                        self.prompt_patterns = [re.compile(p) for p in custom_prompts]
+                        
+                    custom_errors = watcher_cfg.get("error_patterns", [])
+                    if custom_errors:
+                        self.error_patterns = [re.compile(p) for p in custom_errors]
+                        
+                    self.idle_threshold = watcher_cfg.get("idle_threshold", self.idle_threshold)
+            except Exception as e:
+                # In a real app we might log this to a file
+                pass
+
         self._last_tree: TmuxTree | None = None
 
     def poll(self) -> tuple[TmuxTree, list[TmuxEvent]]:
