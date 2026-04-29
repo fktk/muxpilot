@@ -6,6 +6,7 @@ import os
 import time
 
 import libtmux
+import psutil
 
 from muxpilot.models import (
     PaneInfo,
@@ -69,6 +70,7 @@ class TmuxClient:
                         width=int(pane.pane_width or 0),
                         height=int(pane.pane_height or 0),
                         is_self=(pane_id == self_pane_id),
+                        full_command=self._get_full_command(pane),
                     )
                     window_info.panes.append(pane_info)
 
@@ -116,6 +118,24 @@ class TmuxClient:
             return True
         except libtmux.exc.LibTmuxException:
             return False
+
+    def _get_full_command(self, pane: libtmux.Pane) -> str:
+        """Get full command line (with arguments) for a pane using psutil.
+
+        If the pane process is a shell with children, returns the child
+        process cmdline. Falls back to pane_current_command on error.
+        """
+        try:
+            pid = int(pane.pane_pid or 0)
+            if pid == 0:
+                return pane.pane_current_command or ""
+            proc = psutil.Process(pid)
+            children = proc.children()
+            if children:
+                return " ".join(children[0].cmdline())
+            return " ".join(proc.cmdline())
+        except (psutil.NoSuchProcess, psutil.AccessDenied, ValueError, TypeError):
+            return pane.pane_current_command or ""
 
     def capture_pane_content(self, pane_id: str, lines: int = 50) -> list[str]:
         """Capture the last N lines of output from a pane."""

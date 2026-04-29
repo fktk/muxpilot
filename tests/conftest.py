@@ -26,6 +26,7 @@ def make_pane(
     status: PaneStatus = PaneStatus.UNKNOWN,
     is_self: bool = False,
     custom_label: str = "",
+    full_command: str = "",
 ) -> PaneInfo:
     """Create a PaneInfo with sensible defaults."""
     return PaneInfo(
@@ -39,6 +40,7 @@ def make_pane(
         status=status,
         is_self=is_self,
         custom_label=custom_label,
+        full_command=full_command,
     )
 
 

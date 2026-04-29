@@ -42,6 +42,7 @@ class PaneInfo:
     status: PaneStatus = PaneStatus.UNKNOWN
     is_self: bool = False
     custom_label: str = ""
+    full_command: str = ""
 
     @property
     def display_label(self) -> str:
@@ -61,8 +62,9 @@ class PaneInfo:
             path = f"{parts[-2]}/{parts[-1]}"
         elif len(parts) == 1 and parts[0] != "":
             path = parts[0]
-            
-        return f"{icon} [{self.current_command}] {path}"
+
+        cmd = self.full_command or self.current_command
+        return f"{icon} [{cmd}] {path}"
 
 
 @dataclass
