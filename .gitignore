@@ -9,3 +9,9 @@ wheels/
 # Virtual environments
 .venv
 .worktrees/
+
+# Test caches
+.pytest_cache/
+
+# Local development docs / plans
+docs/
