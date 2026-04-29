@@ -106,6 +106,12 @@ class MuxpilotApp(App[str | None]):
         self._notify_channel = NotifyChannel()
         self._label_store = LabelStore()
         self._rename_key: str | None = None
+        self.theme = self._label_store.get_theme()
+
+    def watch_theme(self, theme: str) -> None:
+        """Save theme to config when it changes."""
+        if hasattr(self, "_label_store"):
+            self._label_store.set_theme(theme)
 
     def compose(self) -> ComposeResult:
         yield Header()
