@@ -109,6 +109,7 @@ def make_mock_client(
     mock.get_current_pane_id.return_value = current_pane_id
     mock.capture_pane_content.return_value = capture_content or ["user@host:~$ "]
     mock.navigate_to.return_value = True
+    mock.kill_pane.return_value = True
     mock.is_inside_tmux.return_value = current_pane_id is not None
     return mock
 
