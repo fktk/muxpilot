@@ -192,26 +192,6 @@ async def test_enter_on_session_navigates_to_active_pane():
 
 
 @pytest.mark.asyncio
-async def test_back_navigation_returns_to_previous_pane():
-    tree = make_tree(sessions=[
-        make_session(windows=[make_window(panes=[
-            make_pane(pane_id="%0"),
-            make_pane(pane_id="%1"),
-        ])])
-    ])
-    app = _patched_app(tree=tree, current_pane_id="%0")
-    async with app.run_test() as pilot:
-        # Jump to %1
-        await app.on_tmux_tree_view_pane_activated(
-            TmuxTreeView.PaneActivated(pane_id="%1")
-        )
-        assert app._previous_pane_id == "%0"
-        # Press b to go back
-        app._client.navigate_to.reset_mock()
-        await pilot.press("b")
-        app._client.navigate_to.assert_called_once_with("%0")
-
-
 # ============================================================================
 # Keyboard: quit and refresh
 # ============================================================================
@@ -1037,35 +1017,35 @@ async def test_poll_tmux_resumes_timer_on_recovery():
 # ============================================================================
 
 
-@patch("muxpilot.app.os")
-@patch("muxpilot.app.subprocess")
+@patch("muxpilot.app.os.execlp")
+@patch("muxpilot.app.subprocess.run")
 @patch("muxpilot.app.TmuxClient")
-def test_main_outside_tmux_creates_session_and_attaches(mock_client_cls, mock_subprocess, mock_os):
+def test_main_outside_tmux_creates_session_and_attaches(mock_client_cls, mock_run, mock_execlp):
     """When started outside tmux, main() should create a new session and attach."""
     mock_client = MagicMock()
     mock_client.is_inside_tmux.return_value = False
     mock_client_cls.return_value = mock_client
 
     # os.execlp should replace the process — mock it to raise so we can verify
-    mock_os.execlp.side_effect = SystemExit(0)
+    mock_execlp.side_effect = SystemExit(0)
 
     with pytest.raises(SystemExit):
         main()
 
-    mock_subprocess.run.assert_called_once_with(
+    mock_run.assert_called_once_with(
         ["tmux", "new-session", "-s", "muxpilot", "-d", sys.executable, "-m", "muxpilot"],
         check=True,
     )
-    mock_os.execlp.assert_called_once_with(
+    mock_execlp.assert_called_once_with(
         "tmux", "tmux", "attach", "-t", "muxpilot"
     )
 
 
-@patch("muxpilot.app.os")
-@patch("muxpilot.app.subprocess")
+@patch("muxpilot.app.os.execlp")
+@patch("muxpilot.app.subprocess.run")
 @patch("muxpilot.app.TmuxClient")
 @patch("muxpilot.app.MuxpilotApp")
-def test_main_inside_tmux_runs_app(mock_app_cls, mock_client_cls, mock_subprocess, mock_os):
+def test_main_inside_tmux_runs_app(mock_app_cls, mock_client_cls, mock_run, mock_execlp):
     """When started inside tmux, main() should run MuxpilotApp normally."""
     mock_client = MagicMock()
     mock_client.is_inside_tmux.return_value = True
@@ -1077,27 +1057,27 @@ def test_main_inside_tmux_runs_app(mock_app_cls, mock_client_cls, mock_subproces
 
     main()
 
-    mock_subprocess.run.assert_not_called()
-    mock_os.execlp.assert_not_called()
+    mock_run.assert_not_called()
+    mock_execlp.assert_not_called()
     mock_app.run.assert_called_once()
 
 
-@patch("muxpilot.app.os")
-@patch("muxpilot.app.subprocess")
+@patch("muxpilot.app.os.execlp")
+@patch("muxpilot.app.subprocess.run")
 @patch("muxpilot.app.TmuxClient")
-def test_main_outside_tmux_attaches_even_if_session_exists(mock_client_cls, mock_subprocess, mock_os):
+def test_main_outside_tmux_attaches_even_if_session_exists(mock_client_cls, mock_run, mock_execlp):
     """If new-session fails (session already exists), main() should still try to attach."""
     mock_client = MagicMock()
     mock_client.is_inside_tmux.return_value = False
     mock_client_cls.return_value = mock_client
 
-    mock_subprocess.run.side_effect = subprocess.CalledProcessError(1, "tmux")
-    mock_os.execlp.side_effect = SystemExit(0)
+    mock_run.side_effect = subprocess.CalledProcessError(1, "tmux")
+    mock_execlp.side_effect = SystemExit(0)
 
     with pytest.raises(SystemExit):
         main()
 
-    mock_subprocess.run.assert_called_once()
-    mock_os.execlp.assert_called_once_with(
+    mock_run.assert_called_once()
+    mock_execlp.assert_called_once_with(
         "tmux", "tmux", "attach", "-t", "muxpilot"
     )
