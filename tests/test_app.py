@@ -103,6 +103,91 @@ async def test_navigate_to_pane():
 
 
 @pytest.mark.asyncio
+async def test_enter_on_window_navigates_to_active_pane():
+    """Selecting a window node (Enter) should emit PaneActivated for its active pane."""
+    from textual.widgets._tree import Tree
+
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", is_active=True),
+            make_pane(pane_id="%1"),
+        ])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%99")
+    async with app.run_test():
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+
+        # Find the window node
+        window_node = None
+        for node_id, (node_type, session, window, pane) in tw._node_data.items():
+            if node_type == "window":
+                window_node = tw.get_node_by_id(node_id)
+                break
+
+        assert window_node is not None
+
+        # Capture posted messages while still delivering them so Textual's
+        # widget lifecycle stays intact.
+        posted = []
+        original_post = tw.post_message
+        def capture_post(msg):
+            posted.append(msg)
+            return original_post(msg)
+        tw.post_message = capture_post
+
+        # Simulate Enter on the window node
+        event = Tree.NodeSelected(window_node)
+        tw.on_tree_node_selected(event)
+
+        # Verify tree emitted PaneActivated for the active pane
+        assert len(posted) == 1
+        assert isinstance(posted[0], TmuxTreeView.PaneActivated)
+        assert posted[0].pane_id == "%0"
+
+
+@pytest.mark.asyncio
+async def test_enter_on_session_navigates_to_active_pane():
+    """Selecting a session node (Enter) should emit PaneActivated for its active window's active pane."""
+    from textual.widgets._tree import Tree
+
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", is_active=True),
+            make_pane(pane_id="%1"),
+        ])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%99")
+    async with app.run_test():
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+
+        # Find the session node
+        session_node = None
+        for node_id, (node_type, session, window, pane) in tw._node_data.items():
+            if node_type == "session":
+                session_node = tw.get_node_by_id(node_id)
+                break
+
+        assert session_node is not None
+
+        # Capture posted messages while still delivering them
+        posted = []
+        original_post = tw.post_message
+        def capture_post(msg):
+            posted.append(msg)
+            return original_post(msg)
+        tw.post_message = capture_post
+
+        # Simulate Enter on the session node
+        event = Tree.NodeSelected(session_node)
+        tw.on_tree_node_selected(event)
+
+        # Verify tree emitted PaneActivated for the active pane
+        assert len(posted) == 1
+        assert isinstance(posted[0], TmuxTreeView.PaneActivated)
+        assert posted[0].pane_id == "%0"
+
+
+@pytest.mark.asyncio
 async def test_back_navigation_returns_to_previous_pane():
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[
