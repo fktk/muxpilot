@@ -417,64 +417,6 @@ async def test_status_bar_shows_icon_legend():
             assert icon in text, f"Icon {icon!r} for {status.value} not found in status bar"
 
 
-# ============================================================================
-# Keyboard: 'a' toggles collapse/expand on ALL tree nodes
-# ============================================================================
-
-
-@pytest.mark.asyncio
-async def test_a_key_collapses_all_nodes():
-    """Pressing 'a' when nodes are expanded should collapse all session/window nodes."""
-    tree = make_tree(sessions=[
-        make_session(session_id="$0", session_name="s0", windows=[
-            make_window(window_id="@0", panes=[make_pane(pane_id="%0")]),
-            make_window(window_id="@1", window_name="w1", panes=[make_pane(pane_id="%1")]),
-        ]),
-        make_session(session_id="$1", session_name="s1", windows=[
-            make_window(window_id="@2", window_name="w2", panes=[make_pane(pane_id="%2")]),
-        ]),
-    ])
-    app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
-        tw = app.query_one("#tmux-tree", TmuxTreeView)
-
-        # All nodes should be expanded initially
-        expandable = [n for n in _all_nodes(tw) if n.allow_expand and n != tw.root]
-        assert all(n.is_expanded for n in expandable), "All nodes should start expanded"
-
-        # Press 'a' → all should collapse
-        await pilot.press("a")
-        await pilot.pause()
-        expandable = [n for n in _all_nodes(tw) if n.allow_expand and n != tw.root]
-        assert all(not n.is_expanded for n in expandable), "All nodes should be collapsed after 'a'"
-
-
-@pytest.mark.asyncio
-async def test_a_key_expands_all_when_all_collapsed():
-    """Pressing 'a' when all nodes are collapsed should expand all."""
-    tree = make_tree(sessions=[
-        make_session(session_id="$0", session_name="s0", windows=[
-            make_window(window_id="@0", panes=[make_pane(pane_id="%0")]),
-        ]),
-        make_session(session_id="$1", session_name="s1", windows=[
-            make_window(window_id="@1", window_name="w1", panes=[make_pane(pane_id="%1")]),
-        ]),
-    ])
-    app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
-        tw = app.query_one("#tmux-tree", TmuxTreeView)
-
-        # Collapse all first
-        await pilot.press("a")
-        await pilot.pause()
-
-        # Press 'a' again → all should expand
-        await pilot.press("a")
-        await pilot.pause()
-        expandable = [n for n in _all_nodes(tw) if n.allow_expand and n != tw.root]
-        assert all(n.is_expanded for n in expandable), "All nodes should be expanded after second 'a'"
-
-
 def _all_nodes(tw: TmuxTreeView):
     """Collect all tree nodes via BFS."""
     nodes = []

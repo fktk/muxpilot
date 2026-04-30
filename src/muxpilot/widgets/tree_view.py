@@ -18,7 +18,6 @@ class TmuxTreeView(Tree[Text]):
     BINDINGS = [
         ("k", "cursor_up", "Up"),
         ("j", "cursor_down", "Down"),
-        ("a", "toggle_expand", "Collapse/Expand"),
     ]
 
     @dataclass
@@ -198,26 +197,6 @@ class TmuxTreeView(Tree[Text]):
             self._restore_state()
 
         self._has_populated = True
-
-    def action_toggle_expand(self) -> None:
-        """Toggle collapse/expand on ALL expandable nodes in the tree."""
-        expandable = []
-        queue = [self.root]
-        while queue:
-            node = queue.pop(0)
-            if node != self.root and node.allow_expand:
-                expandable.append(node)
-            queue.extend(node.children)
-
-        if not expandable:
-            return
-
-        any_expanded = any(n.is_expanded for n in expandable)
-        for node in expandable:
-            if any_expanded:
-                node.collapse()
-            else:
-                node.expand()
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted[Text]) -> None:
         """When a node is highlighted, emit NodeInfo for the detail panel."""
