@@ -185,30 +185,7 @@ class MuxpilotApp(App[str | None]):
             self._notify_channel.send(f"Error fetching tmux info: {e}")
             return
 
-        self._apply_labels(tree)
-
-        # Update tree view
-        tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
-        tree_widget.populate(
-            tree,
-            current_pane_id=self._current_pane_id,
-            status_filter=self._status_filter,
-            name_filter=self._name_filter
-        )
-        
-        # Update filter bar
-        filter_bar = self.query_one("#filter-bar", FilterBar)
-        filter_bar.update(self._status_filter, self._name_filter)
-
-        # Update status bar
-        status_bar = self.query_one("#status-bar", StatusBar)
-        status_bar.update_stats(tree)
-
-        # Show events as notifications (skip status_changed — shown via icons)
-        for event in events:
-            status_bar.show_event(event)
-            if event.event_type not in ("status_changed", "focus_changed"):
-                self._notify_channel.send(event.message)
+        await self._update_ui_from_poll(tree, events, rebuild_tree=True)
 
     async def _poll_tmux(self) -> None:
         """Periodic polling callback."""
@@ -227,26 +204,38 @@ class MuxpilotApp(App[str | None]):
         self._poll_backoff = self._watcher.poll_interval  # reset on success
         if self._poll_timer is not None:
             self._poll_timer.resume()
+
+        await self._update_ui_from_poll(tree, events, rebuild_tree=bool(events))
+
+    async def _update_ui_from_poll(
+        self,
+        tree: TmuxTree,
+        events: list[TmuxEvent],
+        *,
+        rebuild_tree: bool = True,
+    ) -> None:
+        """Apply labels and update all UI widgets from a poll result."""
         self._apply_labels(tree)
 
-        # Update status bar
-        status_bar = self.query_one("#status-bar", StatusBar)
-        status_bar.update_stats(tree)
-
-        # Only rebuild tree if structure changed
-        if events:
+        if rebuild_tree:
             tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
             tree_widget.populate(
                 tree,
                 current_pane_id=self._current_pane_id,
                 status_filter=self._status_filter,
-                name_filter=self._name_filter
+                name_filter=self._name_filter,
             )
 
-            for event in events:
-                status_bar.show_event(event)
-                if event.event_type not in ("status_changed", "focus_changed"):
-                    self._notify_channel.send(event.message)
+            filter_bar = self.query_one("#filter-bar", FilterBar)
+            filter_bar.update(self._status_filter, self._name_filter)
+
+        status_bar = self.query_one("#status-bar", StatusBar)
+        status_bar.update_stats(tree)
+
+        for event in events:
+            status_bar.show_event(event)
+            if event.event_type not in ("status_changed", "focus_changed"):
+                self._notify_channel.send(event.message)
 
     def on_tmux_tree_view_node_info(self, message: TmuxTreeView.NodeInfo) -> None:
         """Handle node highlight → update detail panel."""
