@@ -48,23 +48,28 @@ class PaneInfo:
     def display_label(self) -> str:
         """Label for tree view display."""
         icon = STATUS_ICONS.get(self.status, "?")
-
         if self.is_self:
-            return "🚀 muxpilot"
-
+            return f"{icon} muxpilot"
         if self.custom_label:
             return f"{icon} {self.custom_label}"
 
-        # パスを親ディレクトリとディレクトリ名の2階層に短縮
-        path = self.current_path
-        parts = path.rstrip("/").split("/")
+        # Use only the last path component unless it is too generic
+        path = self.current_path.rstrip("/")
+        parts = path.split("/")
         if len(parts) >= 2:
-            path = f"{parts[-2]}/{parts[-1]}"
-        elif len(parts) == 1 and parts[0] != "":
-            path = parts[0]
+            short_path = f"{parts[-2]}/{parts[-1]}"
+        else:
+            short_path = parts[-1] if parts else ""
 
+        # Prefer a concise command; skip bare shells if we have a child process
         cmd = self.full_command or self.current_command
-        return f"{icon} [{cmd}] {path}"
+        shell_names = {"bash", "zsh", "fish", "sh", "tmux"}
+        if self.current_command in shell_names and self.full_command:
+            cmd = self.full_command.split()[0].split("/")[-1] if self.full_command else self.current_command
+        else:
+            cmd = self.current_command or self.full_command
+
+        return f"{icon} {cmd} — {short_path}"
 
 
 @dataclass

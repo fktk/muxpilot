@@ -57,7 +57,7 @@ class TestPaneInfoDisplayLabel:
         expected_icon = STATUS_ICONS[status]
         assert pane.display_label.startswith(expected_icon)
         assert "work/dir" in pane.display_label
-        assert "[vim]" in pane.display_label
+        assert "vim" in pane.display_label
         assert "%5" not in pane.display_label
 
     def test_display_label_path_shortening(self) -> None:
@@ -79,15 +79,17 @@ class TestPaneInfoDisplayLabel:
         assert "%0" not in label
 
     def test_display_label_empty_command(self) -> None:
-        """Empty command should produce empty brackets."""
+        """Empty command should not produce brackets."""
         pane = make_pane(current_command="")
-        assert "[]" in pane.display_label
+        assert "[]" not in pane.display_label
+        assert " — " in pane.display_label
 
     def test_display_label_self_pane_shows_muxpilot(self) -> None:
         """Self pane should show 'muxpilot' instead of path."""
         pane = make_pane(is_self=True, current_path="/some/long/path", current_command="python")
         label = pane.display_label
-        assert label == "🚀 muxpilot"
+        expected_icon = STATUS_ICONS[PaneStatus.UNKNOWN]
+        assert label == f"{expected_icon} muxpilot"
         assert "/some/long/path" not in label
 
     def test_display_label_non_self_pane_shows_path(self) -> None:
@@ -109,7 +111,7 @@ class TestPaneInfoDisplayLabel:
             status=PaneStatus.IDLE,
             custom_label="",
         )
-        assert "[vim]" in pane.display_label
+        assert "vim" in pane.display_label
 
     def test_display_label_self_pane_ignores_custom_label(self) -> None:
         """Self pane should always show [muxpilot] regardless of custom_label."""
@@ -118,14 +120,14 @@ class TestPaneInfoDisplayLabel:
         assert "something else" not in pane.display_label
 
     def test_display_label_uses_full_command_when_available(self) -> None:
-        """When full_command is set, it should be used instead of current_command."""
+        """When current_command is a shell and full_command is set, extract the binary name."""
         pane = make_pane(
             current_command="bash",
             current_path="/home/user/project",
             full_command="python script.py --verbose",
         )
-        assert "[python script.py --verbose]" in pane.display_label
-        assert "[bash]" not in pane.display_label
+        assert "python" in pane.display_label
+        assert "bash" not in pane.display_label
 
     def test_display_label_falls_back_to_current_command(self) -> None:
         """When full_command is empty, current_command should be used."""
@@ -134,7 +136,23 @@ class TestPaneInfoDisplayLabel:
             current_path="/home/user/project",
             full_command="",
         )
-        assert "[vim]" in pane.display_label
+        assert "vim" in pane.display_label
+
+    def test_pane_label_uses_shortened_path(self) -> None:
+        """Pane label should use a shortened path and concise command."""
+        from muxpilot.models import PaneInfo
+        p = PaneInfo(
+            pane_id="%0", pane_index=0,
+            current_command="zsh", current_path="/home/user/projects/muxpilot/src",
+            is_active=False, width=80, height=24,
+            full_command="/bin/zsh"
+        )
+        label = p.display_label
+        assert "zsh" in label
+        assert "/home/user" not in label
+        assert "muxpilot/src" in label or "src" in label
+        assert "[" not in label
+        assert " — " in label
 
 
 # ============================================================================
