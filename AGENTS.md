@@ -9,7 +9,13 @@ muxpilot — tmux session/window/pane をナビゲートする TUI ツール。A
 - **TDD**: テストを先に書き、実装してからテストを通す。
 - **パッケージ管理**: `uv` を使う。`pip` や `poetry` は使わない。
 - **Python 実行**: `uv run ...` で実行する。
-- **機能開発ブランチ**: `git worktree` を使って独立したディレクトリで作業する。`using-git-worktrees` スキルを参照。
+- **機能開発ブランチ（必須）**: すべての機能開発・バグ修正は、**必ず git worktree を使って独立したディレクトリで行う**。main ブランチへの直接コミット、および同じワークディレクトリでのブランチ切り替えは禁止。
+  
+  1. **ディレクトリ選定**: `.worktrees/` を優先（なければ作成）。`worktrees/` は代替。両方存在する場合は `.worktrees/` を使用する。
+  2. **.gitignore 確認**: プロジェクトローカルの worktree ディレクトリを作成・使用前に、必ず `.gitignore` に含まれているか確認する (`git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/dev/null`)。含まれていない場合は、**即座に `.gitignore` に追加しコミットしてから** worktree を作成する。
+  3. **セットアップ**: `git worktree add .worktrees/<branch> -b <branch>` → `cd .worktrees/<branch>` → `uv sync`
+  4. **ベースラインテスト**: 作業開始前に必ず `uv run pytest tests/ -v` を実行し、クリーンな状態であることを確認する。テストが失敗する場合は失敗内容を報告し、明示的な確認を取ってから作業を進める。
+  5. **作業完了後**: `finishing-a-development-branch` スキルに従い、マージ/PR/保持/破棄の4つの選択肢を提示し、選択に応じてブランチ・worktree を適切にクリーンアップする。
 
 ## コマンド
 
