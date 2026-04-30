@@ -43,7 +43,6 @@ class HelpScreen(ModalScreen[None]):
                 ("↑ / k", "Move cursor up"),
                 ("↓ / j", "Move cursor down"),
                 ("Enter", "Jump to selected pane"),
-                ("a", "Collapse / expand all"),
                 ("r", "Manual refresh"),
                 ("/", "Toggle name filter"),
                 ("e", "Show only error panes"),
