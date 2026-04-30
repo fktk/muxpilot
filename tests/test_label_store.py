@@ -117,3 +117,75 @@ class TestLabelStoreEdgeCases:
         store.set("myproject", "something")
         store.set("myproject", "")
         assert store.get("myproject") == ""
+
+
+class TestLabelStoreCommentPreservation:
+    """Comments and formatting must survive label edits."""
+
+    def test_preserves_comments_and_watcher_section(self, tmp_path: Path) -> None:
+        """Setting a label must not strip TOML comments or unrelated sections."""
+        config_path = tmp_path / "config.toml"
+        original_text = '''# muxpilot configuration
+# Place this file at ~/.config/muxpilot/config.toml
+
+[app]
+# UI theme
+theme = "textual-dark"
+
+[watcher]
+# Polling interval
+poll_interval = 2.0
+
+# Prompt patterns
+# Default prompt patterns are:
+#   '[$>?]\\s*$'
+prompt_patterns = [
+  '[$>?]\\s*$',
+  'In \\[\\d+\\]: ',
+]
+
+# Error patterns
+error_patterns = [
+  '(?i)Error|Exception',
+]
+'''
+        config_path.write_text(original_text, encoding="utf-8")
+        store = LabelStore(config_path=config_path)
+        store.set("myproject", "label")
+
+        saved_text = config_path.read_text(encoding="utf-8")
+        # Comments must survive
+        assert "# muxpilot configuration" in saved_text
+        assert "# Polling interval" in saved_text
+        assert "# Prompt patterns" in saved_text
+        assert "# Error patterns" in saved_text
+        # Arrays must survive
+        import tomllib
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+        assert data["watcher"]["poll_interval"] == 2.0
+        assert len(data["watcher"]["prompt_patterns"]) == 2
+        assert len(data["watcher"]["error_patterns"]) == 1
+        assert data["labels"]["myproject"] == "label"
+
+    def test_preserves_comments_when_updating_existing_label(self, tmp_path: Path) -> None:
+        """Updating a label must not strip surrounding comments."""
+        config_path = tmp_path / "config.toml"
+        original_text = '''[watcher]
+poll_interval = 2.0
+
+[labels]
+# main project
+myproject = "old"
+# secondary project
+other = "value"
+'''
+        config_path.write_text(original_text, encoding="utf-8")
+        store = LabelStore(config_path=config_path)
+        store.set("myproject", "new")
+
+        saved_text = config_path.read_text(encoding="utf-8")
+        assert "# main project" in saved_text
+        assert "# secondary project" in saved_text
+        assert 'myproject = "new"' in saved_text
+        assert "[watcher]" in saved_text
