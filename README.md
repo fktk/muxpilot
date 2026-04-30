@@ -11,24 +11,22 @@ It is designed specifically for **AI agent orchestration** and managing tasks ru
 
 ## ✨ Features
 
-- **🌲 Hierarchical Tree Display**: Displays the tmux `Session → Window → Pane` structure as a tree.
+- **🌲 Hierarchical Tree Display**: Displays the tmux `Session → Window → Pane` structure as a tree. Sessions are marked with `■` and windows with `□`.
 - **⌨️ Keyboard Navigation**: Vim-like keybindings (`j`/`k`) for quickly moving between panes.
 - **🔍 Filtering**:
   - `/`: Filter by name (session name, command, path, etc.)
   - `w`: Extract only panes waiting for input (prompt displayed)
   - `e`: Extract only panes with errors
   - `c`: Clear filters and show all
-- **👀 Status Monitoring**: Periodically polls each pane's output and automatically assigns the following status icons:
+- **👀 Status Monitoring**: Periodically polls each pane's output and automatically assigns one of three status icons:
 
   | Icon | Status | Detection Condition |
   |:---:|---|---|
-  | `●` | ACTIVE | Pane output changed since last poll (command running, log output, etc.) |
-  | `○` | IDLE | Not a prompt, but output hasn't changed for more than a certain time (default 10 seconds) |
-  | `◆` | WAITING | Last line matches a prompt pattern and idle time exceeds threshold (waiting for user input) |
+  | `●` | ACTIVE | Pane output changed since last poll, or no prompt/error detected (command running, log output, etc.) |
+  | `◆` | WAITING | Last line matches a prompt pattern (waiting for user input) |
   | `▲` | ERROR | Error pattern (`Traceback`, `Error:`, `FAILED`, etc.) detected in the last 10 lines |
-  | `■` | COMPLETED | Last line matches a prompt pattern and idle time is within threshold (right after command completion) |
 
-  Status is determined in priority order: **ERROR → COMPLETED / WAITING → IDLE → ACTIVE**.
+  Status is determined in priority order: **ERROR → WAITING → ACTIVE**.
 
 - **🏷️ Custom Labels**: Rename sessions, windows, and panes with the `n` key. Labels are persisted to `~/.config/muxpilot/config.toml`.
 - **📋 Detail Panel**: Displays detailed information about the selected pane, such as the running command, current directory, size, and status.
@@ -61,12 +59,10 @@ You can customize watcher behavior by creating `~/.config/muxpilot/config.toml`:
 [watcher]
 prompt_patterns = ['[$>?]\s*$', 'In \[\d+\]: ']
 error_patterns = ['(?i)Error|Exception|Traceback|FAILED|panic|Segmentation fault|FATAL']
-idle_threshold = 10.0
 ```
 
 - `prompt_patterns`: Regex list for detecting prompts. **Replaces** the default patterns entirely.
 - `error_patterns`: Regex list for detecting errors. **Replaces** the default patterns entirely.
-- `idle_threshold`: Seconds before a pane is considered idle.
 
 ### Theme
 
