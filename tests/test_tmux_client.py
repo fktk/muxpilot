@@ -15,7 +15,7 @@ from muxpilot.tmux_client import (
 )
 
 
-def _mock_pane(pane_id="%0", cmd="bash", path="/home/user", active="1", w="80", h="24"):
+def _mock_pane(pane_id="%0", cmd="bash", path="/home/user", active="1", w="80", h="24", pid="1234"):
     p = MagicMock()
     p.pane_id = pane_id
     p.pane_index = "0"
@@ -24,6 +24,7 @@ def _mock_pane(pane_id="%0", cmd="bash", path="/home/user", active="1", w="80", 
     p.pane_active = active
     p.pane_width = w
     p.pane_height = h
+    p.pane_pid = pid
     return p
 
 
@@ -190,3 +191,53 @@ class TestHelpers:
     def test_active_pane(self):
         p = MagicMock(); p.pane_active = "1"
         assert _is_active_pane(p) is True
+
+
+class TestGetFullCommand:
+    def test_child_process(self):
+        """When shell has a child process, return child's cmdline."""
+        p = _mock_pane(cmd="bash", pid="1234")
+        c = _client_with([])
+
+        mock_child = MagicMock()
+        mock_child.cmdline.return_value = ["python", "script.py", "--help"]
+        mock_proc = MagicMock()
+        mock_proc.children.return_value = [mock_child]
+        mock_proc.cmdline.return_value = ["bash"]
+
+        with patch("muxpilot.tmux_client.psutil.Process", return_value=mock_proc):
+            result = c._get_full_command(p)
+        assert result == "python script.py --help"
+
+    def test_no_child_process(self):
+        """When no child process, return the shell's own cmdline."""
+        p = _mock_pane(cmd="bash", pid="1234")
+        c = _client_with([])
+
+        mock_proc = MagicMock()
+        mock_proc.children.return_value = []
+        mock_proc.cmdline.return_value = ["bash", "-l"]
+
+        with patch("muxpilot.tmux_client.psutil.Process", return_value=mock_proc):
+            result = c._get_full_command(p)
+        assert result == "bash -l"
+
+    def test_process_not_found(self):
+        """Fallback to pane_current_command when process is gone."""
+        import psutil
+        p = _mock_pane(cmd="bash", pid="1234")
+        c = _client_with([])
+
+        with patch("muxpilot.tmux_client.psutil.Process", side_effect=psutil.NoSuchProcess(1234)):
+            result = c._get_full_command(p)
+        assert result == "bash"
+
+    def test_access_denied(self):
+        """Fallback to pane_current_command on permission error."""
+        import psutil
+        p = _mock_pane(cmd="bash", pid="1234")
+        c = _client_with([])
+
+        with patch("muxpilot.tmux_client.psutil.Process", side_effect=psutil.AccessDenied(1234)):
+            result = c._get_full_command(p)
+        assert result == "bash"

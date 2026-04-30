@@ -104,6 +104,25 @@ class TestPaneInfoDisplayLabel:
         assert "muxpilot" in pane.display_label
         assert "something else" not in pane.display_label
 
+    def test_display_label_uses_full_command_when_available(self) -> None:
+        """When full_command is set, it should be used instead of current_command."""
+        pane = make_pane(
+            current_command="bash",
+            current_path="/home/user/project",
+            full_command="python script.py --verbose",
+        )
+        assert "[python script.py --verbose]" in pane.display_label
+        assert "[bash]" not in pane.display_label
+
+    def test_display_label_falls_back_to_current_command(self) -> None:
+        """When full_command is empty, current_command should be used."""
+        pane = make_pane(
+            current_command="vim",
+            current_path="/home/user/project",
+            full_command="",
+        )
+        assert "[vim]" in pane.display_label
+
 
 # ============================================================================
 # WindowInfo.display_label

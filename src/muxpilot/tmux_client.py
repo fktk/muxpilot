@@ -6,6 +6,7 @@ import os
 import time
 
 import libtmux
+import psutil
 
 from muxpilot.models import (
     PaneInfo,
@@ -20,6 +21,7 @@ class TmuxClient:
 
     def __init__(self) -> None:
         self._server: libtmux.Server | None = None
+        self._pane_cache: dict[str, libtmux.Pane] = {}
 
     @property
     def server(self) -> libtmux.Server:
@@ -40,6 +42,7 @@ class TmuxClient:
         """Fetch the complete tmux session/window/pane hierarchy."""
         tree = TmuxTree(timestamp=time.time())
         self_pane_id = self.get_current_pane_id()
+        pane_cache: dict[str, libtmux.Pane] = {}
 
         for session in self.server.sessions:
             session_info = SessionInfo(
@@ -60,6 +63,8 @@ class TmuxClient:
 
                 for pane in window.panes:
                     pane_id = pane.pane_id or ""
+                    if pane_id:
+                        pane_cache[pane_id] = pane
                     pane_info = PaneInfo(
                         pane_id=pane_id,
                         pane_index=int(pane.pane_index or 0),
@@ -69,12 +74,17 @@ class TmuxClient:
                         width=int(pane.pane_width or 0),
                         height=int(pane.pane_height or 0),
                         is_self=(pane_id == self_pane_id),
+                        full_command=self._get_full_command(pane),
                     )
                     window_info.panes.append(pane_info)
 
                 session_info.windows.append(window_info)
 
             tree.sessions.append(session_info)
+
+        # Update pane cache so subsequent lookups (e.g. capture_pane) don't
+        # re-fetch the entire tree via N+1 tmux commands.
+        self._pane_cache = pane_cache
 
         return tree
 
@@ -117,6 +127,24 @@ class TmuxClient:
         except libtmux.exc.LibTmuxException:
             return False
 
+    def _get_full_command(self, pane: libtmux.Pane) -> str:
+        """Get full command line (with arguments) for a pane using psutil.
+
+        If the pane process is a shell with children, returns the child
+        process cmdline. Falls back to pane_current_command on error.
+        """
+        try:
+            pid = int(pane.pane_pid or 0)
+            if pid == 0:
+                return pane.pane_current_command or ""
+            proc = psutil.Process(pid)
+            children = proc.children()
+            if children:
+                return " ".join(children[0].cmdline())
+            return " ".join(proc.cmdline())
+        except (psutil.NoSuchProcess, psutil.AccessDenied, ValueError, TypeError):
+            return pane.pane_current_command or ""
+
     def capture_pane_content(self, pane_id: str, lines: int = 50) -> list[str]:
         """Capture the last N lines of output from a pane."""
         pane = self._find_pane(pane_id)
@@ -135,7 +163,14 @@ class TmuxClient:
             return []
 
     def _find_pane(self, pane_id: str) -> libtmux.Pane | None:
-        """Find a pane object by its ID across all sessions."""
+        """Find a pane object by its ID across all sessions.
+
+        Uses a cache populated by get_tree() to avoid redundant tmux commands.
+        Falls back to a full server scan if the cache miss.
+        """
+        if pane_id in self._pane_cache:
+            return self._pane_cache[pane_id]
+
         for session in self.server.sessions:
             for window in session.windows:
                 for pane in window.panes:

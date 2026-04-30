@@ -233,7 +233,7 @@ class MuxpilotApp(App[str | None]):
         elif message.node_type == "session" and message.session_info:
             detail.show_session(message.session_info)
 
-    def on_tmux_tree_view_pane_activated(self, message: TmuxTreeView.PaneActivated) -> None:
+    async def on_tmux_tree_view_pane_activated(self, message: TmuxTreeView.PaneActivated) -> None:
         """Handle pane activation (Enter) → navigate to the pane."""
         pane_id = message.pane_id
 
@@ -244,12 +244,8 @@ class MuxpilotApp(App[str | None]):
 
         success = self._client.navigate_to(pane_id)
         if success:
-            # We should NOT use asyncio.create_task here because this method is not an async function
-            # and we are not in an async context where create_task is appropriate without a loop.
-            # Instead, we can use self.call_later or just rely on the polling.
-            # But since we want it immediate, let's use self.set_interval or just trigger refresh.
             self._notify_channel.send(f"Navigated to {pane_id}")
-            asyncio.run_coroutine_threadsafe(self._do_refresh(), asyncio.get_event_loop())
+            await self._do_refresh()
         else:
             self._notify_channel.send(f"Failed to navigate to {pane_id}")
 
@@ -268,12 +264,12 @@ class MuxpilotApp(App[str | None]):
             self._name_filter = event.value
             await self._do_refresh()
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle Enter key in filter or rename input."""
         if event.input.id == "filter-input":
             self.query_one("#tmux-tree").focus()
         elif event.input.id == "rename-input":
-            self._finish_rename(event.value)
+            await self._finish_rename(event.value)
 
     def action_filter(self) -> None:
         """Open filter input (/ key)."""
@@ -343,7 +339,7 @@ class MuxpilotApp(App[str | None]):
         rename_input.add_class("-active")
         rename_input.focus()
 
-    def _finish_rename(self, value: str) -> None:
+    async def _finish_rename(self, value: str) -> None:
         """Save the rename and close the input."""
         if self._rename_key is not None:
             if value:
@@ -356,7 +352,7 @@ class MuxpilotApp(App[str | None]):
         rename_input.value = ""
         rename_input.remove_class("-active")
         self.query_one("#tmux-tree").focus()
-        asyncio.ensure_future(self._do_refresh())
+        await self._do_refresh()
 
     def _cancel_rename(self) -> None:
         """Cancel rename without saving."""
@@ -389,7 +385,7 @@ class MuxpilotApp(App[str | None]):
         self._kill_pane_id = pane.pane_id
         self._notify_channel.send(f"Kill pane {pane.pane_id}? (y/n)")
 
-    def _confirm_kill_pane(self) -> None:
+    async def _confirm_kill_pane(self) -> None:
         """Execute the pending pane kill."""
         if self._kill_pane_id is None:
             return
@@ -399,7 +395,7 @@ class MuxpilotApp(App[str | None]):
         success = self._client.kill_pane(pane_id)
         if success:
             self._notify_channel.send(f"Killed pane {pane_id}")
-            asyncio.ensure_future(self._do_refresh())
+            await self._do_refresh()
         else:
             self._notify_channel.send(f"Failed to kill pane {pane_id}")
 
@@ -409,12 +405,12 @@ class MuxpilotApp(App[str | None]):
             self._kill_pane_id = None
             self._notify_channel.send("Kill cancelled")
 
-    def on_key(self, event) -> None:
+    async def on_key(self, event) -> None:
         """Handle Escape key during rename or kill confirmation."""
         # Kill confirmation mode
         if self._kill_pane_id is not None:
             if event.key in ("y", "enter"):
-                self._confirm_kill_pane()
+                await self._confirm_kill_pane()
                 event.prevent_default()
                 event.stop()
             elif event.key in ("n", "escape"):

@@ -95,6 +95,7 @@ class NotifyChannel:
             # Use select to wait for data with timeout
             ready, _, _ = select.select([fd], [], [], 0.5)
             if not ready:
+                os.close(fd)
                 return None
             
             # Data is available, read it

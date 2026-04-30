@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -60,5 +62,13 @@ class LabelStore:
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self._path, "wb") as f:
-            tomli_w.dump(self._data, f)
+        fd, temp_path = tempfile.mkstemp(dir=self._path.parent, prefix=".tmp_")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                tomli_w.dump(self._data, f)
+            os.replace(temp_path, self._path)
+        except Exception:
+            os.close(fd)
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            raise

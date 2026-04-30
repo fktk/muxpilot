@@ -139,7 +139,7 @@ class TestAnalyzePane:
     def test_first_analysis(self):
         w = _make_watcher()
         w._last_tree = make_tree(timestamp=100.0)
-        activity = w._analyze_pane("%0", ["hello"], None, 100.0)
+        activity = w._analyze_pane("%0", ["hello"], None, 0.0)
         assert activity.pane_id == "%0"
         assert activity.idle_seconds == 0.0
         assert activity.last_content_hash != ""
@@ -147,18 +147,18 @@ class TestAnalyzePane:
     def test_content_unchanged_increments_idle(self):
         w = _make_watcher()
         w._last_tree = make_tree(timestamp=100.0)
-        first = w._analyze_pane("%0", ["hello"], None, 100.0)
+        first = w._analyze_pane("%0", ["hello"], None, 0.0)
         w._last_tree = make_tree(timestamp=100.0)
-        second = w._analyze_pane("%0", ["hello"], first, 102.0)
+        second = w._analyze_pane("%0", ["hello"], first, 2.0)
         assert second.idle_seconds == 2.0
 
     def test_content_changed_resets_idle(self):
         w = _make_watcher()
         w._last_tree = make_tree(timestamp=100.0)
-        first = w._analyze_pane("%0", ["hello"], None, 100.0)
+        first = w._analyze_pane("%0", ["hello"], None, 0.0)
         first.idle_seconds = 10.0
         w._last_tree = make_tree(timestamp=100.0)
-        second = w._analyze_pane("%0", ["world"], first, 102.0)
+        second = w._analyze_pane("%0", ["world"], first, 2.0)
         assert second.idle_seconds == 0.0
 
 
