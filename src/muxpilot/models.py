@@ -9,22 +9,16 @@ from enum import Enum
 class PaneStatus(Enum):
     """Estimated status of a pane based on its output patterns."""
 
-    ACTIVE = "active"          # 出力中（ログが流れている等）
-    IDLE = "idle"              # 出力停止中
+    ACTIVE = "active"          # 実行中（出力変化あり、または変化停止中）
     WAITING_INPUT = "waiting"  # プロンプト表示中（指示待ち）
     ERROR = "error"            # エラーパターン検出
-    COMPLETED = "completed"    # コマンド完了（シェルプロンプト復帰）
-    UNKNOWN = "unknown"        # 初回・判定不能
 
 
 # ステータスに対応するアイコン
 STATUS_ICONS: dict[PaneStatus, str] = {
     PaneStatus.ACTIVE: "●",
-    PaneStatus.IDLE: "○",
     PaneStatus.WAITING_INPUT: "◆",
     PaneStatus.ERROR: "▲",
-    PaneStatus.COMPLETED: "■",
-    PaneStatus.UNKNOWN: "?",
 }
 
 
@@ -39,7 +33,7 @@ class PaneInfo:
     is_active: bool
     width: int
     height: int
-    status: PaneStatus = PaneStatus.UNKNOWN
+    status: PaneStatus = PaneStatus.ACTIVE
     is_self: bool = False
     custom_label: str = ""
     full_command: str = ""
@@ -85,9 +79,9 @@ class WindowInfo:
     def display_label(self) -> str:
         """Label for tree view display."""
         if self.custom_label:
-            return f"🪟 {self.custom_label}"
+            return f"□ {self.custom_label}"
         active = " *" if self.is_active else ""
-        return f"🪟 {self.window_index}: {self.window_name}{active}"
+        return f"□ {self.window_index}: {self.window_name}{active}"
 
 
 @dataclass
@@ -104,9 +98,9 @@ class SessionInfo:
     def display_label(self) -> str:
         """Label for tree view display."""
         if self.custom_label:
-            return f"📦 {self.custom_label}"
+            return f"■ {self.custom_label}"
         attached = " (attached)" if self.is_attached else ""
-        return f"📦 {self.session_name}{attached}"
+        return f"■ {self.session_name}{attached}"
 
 
 @dataclass
@@ -141,7 +135,7 @@ class PaneActivity:
     last_content_hash: str = ""
     last_line: str = ""
     idle_seconds: float = 0.0
-    status: PaneStatus = PaneStatus.UNKNOWN
+    status: PaneStatus = PaneStatus.ACTIVE
 
 
 @dataclass

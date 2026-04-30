@@ -505,9 +505,9 @@ async def test_status_changed_events_not_notified():
         status_event = TmuxEvent(
             event_type="status_changed",
             pane_id="%0",
-            old_status=PaneStatus.IDLE,
+            old_status=PaneStatus.WAITING_INPUT,
             new_status=PaneStatus.ACTIVE,
-            message="%0: idle → active",
+            message="%0: waiting → active",
         )
         # Call the event handling code path directly
         status_bar = app.query_one("#status-bar")

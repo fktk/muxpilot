@@ -29,11 +29,8 @@ def test_status_icons_are_unified_geometric_symbols():
     """STATUS_ICONS should use consistent geometric symbols, not mixed emoji."""
     expected = {
         PaneStatus.ACTIVE: "●",
-        PaneStatus.IDLE: "○",
         PaneStatus.WAITING_INPUT: "◆",
         PaneStatus.ERROR: "▲",
-        PaneStatus.COMPLETED: "■",
-        PaneStatus.UNKNOWN: "?",
     }
     assert STATUS_ICONS == expected
 
@@ -100,7 +97,7 @@ class TestPaneInfoDisplayLabel:
         pane = make_pane(
             current_command="vim",
             current_path="/home/user/project",
-            status=PaneStatus.IDLE,
+            status=PaneStatus.ACTIVE,
             custom_label="",
         )
         assert "vim" in pane.display_label
@@ -164,7 +161,7 @@ class TestWindowInfoDisplayLabel:
     def test_display_label_with_custom_label(self) -> None:
         """When custom_label is set, display_label should return it."""
         window = make_window(window_name="editor", is_active=True, custom_label="My Editor")
-        assert window.display_label == "🪟 My Editor"
+        assert window.display_label == "□ My Editor"
 
     def test_display_label_custom_label_empty_uses_default(self) -> None:
         """When custom_label is empty, display_label should use default format."""
@@ -196,7 +193,7 @@ class TestSessionInfoDisplayLabel:
     def test_display_label_with_custom_label(self) -> None:
         """When custom_label is set, display_label should return it."""
         session = make_session(session_name="work", is_attached=True, custom_label="🚀 Main")
-        assert session.display_label == "📦 🚀 Main"
+        assert session.display_label == "■ 🚀 Main"
 
     def test_display_label_custom_label_empty_uses_default(self) -> None:
         """When custom_label is empty, display_label should use default format."""
