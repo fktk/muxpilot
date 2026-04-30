@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
-import tomllib
 from pathlib import Path
 
-import tomli_w
+import tomlkit
+from tomlkit.toml_document import TOMLDocument
 
 
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "muxpilot" / "config.toml"
@@ -24,51 +22,54 @@ class LabelStore:
 
     def __init__(self, config_path: Path | None = None) -> None:
         self._path = config_path or DEFAULT_CONFIG_PATH
-        self._data: dict = self._load()
+        self._doc: TOMLDocument = self._load()
 
     def get(self, key: str) -> str:
         """Return the custom label for *key*, or empty string if unset."""
-        return self._data.get("labels", {}).get(key, "")
+        labels = self._doc.get("labels")
+        if labels is None:
+            return ""
+        return labels.get(key, "")  # type: ignore[no-any-return]
 
     def set(self, key: str, label: str) -> None:
         """Set (or delete if empty) a custom label and persist to disk."""
         if not label:
             self.delete(key)
             return
-        self._data.setdefault("labels", {})[key] = label
+        if "labels" not in self._doc:
+            self._doc.add("labels", tomlkit.table())
+        self._doc["labels"][key] = label  # type: ignore[index]
         self._save()
 
     def delete(self, key: str) -> None:
         """Remove a custom label. No-op if key doesn't exist."""
-        labels = self._data.get("labels", {})
+        labels = self._doc.get("labels")
+        if labels is None:
+            return
         if key in labels:
             del labels[key]
             self._save()
 
     def get_theme(self) -> str:
         """Return the stored theme or 'textual-dark' default."""
-        return self._data.get("app", {}).get("theme", "textual-dark")
+        app = self._doc.get("app")
+        if app is None:
+            return "textual-dark"
+        return app.get("theme", "textual-dark")  # type: ignore[no-any-return]
 
     def set_theme(self, theme: str) -> None:
         """Set the theme and persist to disk."""
-        self._data.setdefault("app", {})["theme"] = theme
+        if "app" not in self._doc:
+            self._doc.add("app", tomlkit.table())
+        self._doc["app"]["theme"] = theme  # type: ignore[index]
         self._save()
 
-    def _load(self) -> dict:
+    def _load(self) -> TOMLDocument:
         if self._path.exists():
-            with open(self._path, "rb") as f:
-                return tomllib.load(f)
-        return {}
+            text = self._path.read_text(encoding="utf-8")
+            return tomlkit.parse(text)
+        return tomlkit.document()
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_path = tempfile.mkstemp(dir=self._path.parent, prefix=".tmp_")
-        try:
-            with os.fdopen(fd, "wb") as f:
-                tomli_w.dump(self._data, f)
-            os.replace(temp_path, self._path)
-        except Exception:
-            os.close(fd)
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
-            raise
+        self._path.write_text(tomlkit.dumps(self._doc), encoding="utf-8")
