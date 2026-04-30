@@ -41,6 +41,7 @@ DEFAULT_ERROR_PATTERNS: list[re.Pattern[str]] = [
 
 # Idle threshold in seconds before a pane is considered idle
 DEFAULT_IDLE_THRESHOLD: float = 10.0
+DEFAULT_POLL_INTERVAL: float = 2.0
 
 
 class TmuxWatcher:
@@ -52,10 +53,12 @@ class TmuxWatcher:
         idle_threshold: float = DEFAULT_IDLE_THRESHOLD,
         capture_lines: int = 30,
         config_path: pathlib.Path | None = None,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
     ) -> None:
         self.client = client
         self.idle_threshold = idle_threshold
         self.capture_lines = capture_lines
+        self.poll_interval = poll_interval
         self.activities: dict[str, PaneActivity] = {}
         self._config_error: str | None = None
 
@@ -81,6 +84,7 @@ class TmuxWatcher:
                         self.error_patterns = [re.compile(p) for p in custom_errors]
 
                     self.idle_threshold = watcher_cfg.get("idle_threshold", self.idle_threshold)
+                    self.poll_interval = watcher_cfg.get("poll_interval", self.poll_interval)
             except Exception as e:
                 self._config_error = str(e)
 

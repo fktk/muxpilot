@@ -61,3 +61,17 @@ def test_watcher_config_error_on_bad_regex():
         assert watcher._config_error is not None
     finally:
         os.unlink(path)
+
+
+def test_watcher_reads_poll_interval_from_config():
+    import tempfile, pathlib
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+        f.write('[watcher]\npoll_interval = 0.5\n')
+        path = f.name
+    client = make_mock_client()
+    try:
+        watcher = TmuxWatcher(client, config_path=pathlib.Path(path))
+        assert watcher.poll_interval == 0.5
+    finally:
+        import os
+        os.unlink(path)

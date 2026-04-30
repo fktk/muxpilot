@@ -115,7 +115,7 @@ class MuxpilotApp(App[str | None]):
         self._notify_config_error()
 
         self._rename_key: str | None = None
-        self._poll_backoff = POLL_INTERVAL_SECONDS
+        self._poll_backoff = self._watcher.poll_interval
         self._poll_timer = None
         self._retry_timer = None
         self.theme = self._label_store.get_theme()
@@ -152,7 +152,7 @@ class MuxpilotApp(App[str | None]):
         await self._do_refresh()
 
         # Start the polling timer
-        self._poll_timer = self.set_interval(POLL_INTERVAL_SECONDS, self._poll_tmux)
+        self._poll_timer = self.set_interval(self._watcher.poll_interval, self._poll_tmux)
 
         # Set initial focus to the tree to avoid the hidden input capturing keys
         self.query_one("#tmux-tree").focus()
@@ -231,7 +231,7 @@ class MuxpilotApp(App[str | None]):
             self._retry_timer = self.set_interval(self._poll_backoff, self._poll_tmux, repeat=False)
             return
 
-        self._poll_backoff = POLL_INTERVAL_SECONDS  # reset on success
+        self._poll_backoff = self._watcher.poll_interval  # reset on success
         if self._poll_timer is not None:
             self._poll_timer.resume()
         self._apply_labels(tree)

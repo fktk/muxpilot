@@ -7,6 +7,9 @@
 theme = "textual-dark"
 
 [watcher]
+# Polling interval in seconds
+poll_interval = 2.0
+
 # Prompt patterns (regular expressions)
 # Specifying these completely REPLACES the default patterns.
 # Uncomment and customize as needed.
