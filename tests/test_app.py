@@ -776,3 +776,33 @@ async def test_poll_tmux_shows_error_on_exception():
         await app._poll_tmux()
         messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
         assert any("tmux down" in m for m in messages)
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_pauses_timer_on_exception():
+    """When watcher.poll raises, the repeating poll timer should be paused."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._poll_timer = MagicMock()
+        app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+        await app._poll_tmux()
+        app._poll_timer.pause.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_resumes_timer_on_recovery():
+    """After a polling failure, success should resume the repeating timer."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._poll_timer = MagicMock()
+        app._watcher.poll = MagicMock(side_effect=[RuntimeError("tmux down"), (tree, [])])
+        await app._poll_tmux()
+        app._poll_timer.pause.assert_called_once()
+        await app._poll_tmux()
+        app._poll_timer.resume.assert_called_once()
