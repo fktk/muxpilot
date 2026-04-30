@@ -49,3 +49,15 @@ def test_watcher_config_error_raises():
         assert watcher._config_error is not None
     finally:
         os.unlink(path)
+
+
+def test_watcher_config_error_on_bad_regex():
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+        f.write('[watcher]\nprompt_patterns = ["["]\n')  # invalid regex
+        path = f.name
+    client = make_mock_client()
+    try:
+        watcher = TmuxWatcher(client, config_path=pathlib.Path(path))
+        assert watcher._config_error is not None
+    finally:
+        os.unlink(path)

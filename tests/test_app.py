@@ -13,7 +13,7 @@ from muxpilot.widgets.tree_view import TmuxTreeView
 from conftest import make_mock_client, make_mock_notify_channel, make_pane, make_session, make_tree, make_window
 
 
-def _patched_app(tree=None, current_pane_id=None, label_store=None):
+def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error=None):
     """Create a MuxpilotApp with a mocked TmuxClient/Watcher."""
     mock_client = make_mock_client(tree=tree, current_pane_id=current_pane_id)
     app = MuxpilotApp()
@@ -21,6 +21,9 @@ def _patched_app(tree=None, current_pane_id=None, label_store=None):
     from muxpilot.watcher import TmuxWatcher
     app._watcher = TmuxWatcher(mock_client)
     app._notify_channel = make_mock_notify_channel()
+    if config_error is not None:
+        app._watcher._config_error = config_error
+        app._notify_channel.send(f"Config error: {config_error}")
     if label_store is not None:
         app._label_store = label_store
     return app
@@ -563,6 +566,16 @@ async def test_kill_pane_self_not_allowed():
 # ============================================================================
 # NotifyChannel lifecycle
 # ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_app_notifies_config_error():
+    """Watcher に config_error があるとき、NotifyChannel にエラーメッセージが送信されること。"""
+    app = _patched_app(config_error="invalid regex")
+    async with app.run_test() as pilot:
+        await pilot.pause(0.1)
+        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
+        assert any("invalid regex" in m for m in messages)
 
 
 @pytest.mark.asyncio
