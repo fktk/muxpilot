@@ -111,6 +111,7 @@ class MuxpilotApp(App[str | None]):
         self._kill_pane_id: str | None = None
         self._poll_backoff = POLL_INTERVAL_SECONDS
         self._poll_timer = None
+        self._retry_timer = None
         self.theme = self._label_store.get_theme()
 
     def watch_theme(self, theme: str) -> None:
@@ -164,6 +165,12 @@ class MuxpilotApp(App[str | None]):
                     if label:
                         pane.custom_label = label
 
+    def _update_current_pane(self, tree: TmuxTree) -> None:
+        """Update _current_pane_id from the tree's active pane."""
+        active_pane = next((p for s in tree.sessions for w in s.windows for p in w.panes if p.is_active), None)
+        if active_pane:
+            self._current_pane_id = active_pane.pane_id
+
     async def _do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
         try:
@@ -173,11 +180,7 @@ class MuxpilotApp(App[str | None]):
             return
 
         self._apply_labels(tree)
-
-        # Update current pane ID from the tree's active pane
-        active_pane = next((p for s in tree.sessions for w in s.windows for p in w.panes if p.is_active), None)
-        if active_pane:
-            self._current_pane_id = active_pane.pane_id
+        self._update_current_pane(tree)
 
         # Update tree view
         tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
@@ -203,17 +206,20 @@ class MuxpilotApp(App[str | None]):
         try:
             tree, events = await asyncio.to_thread(self._watcher.poll)
         except Exception as e:
-            self._notify_channel.send(f"tmux poll failed: {e}")
+            self._notify_channel.send(f"tmux poll failed: {e}; retrying in {self._poll_backoff}s")
             self._poll_backoff = min(self._poll_backoff * 2, MAX_POLL_BACKOFF_SECONDS)
             if self._poll_timer is not None:
                 self._poll_timer.pause()
-            self.set_interval(self._poll_backoff, self._poll_tmux, repeat=False)
+            if self._retry_timer is not None:
+                self._retry_timer.stop()
+            self._retry_timer = self.set_interval(self._poll_backoff, self._poll_tmux, repeat=False)
             return
 
         self._poll_backoff = POLL_INTERVAL_SECONDS  # reset on success
         if self._poll_timer is not None:
             self._poll_timer.resume()
         self._apply_labels(tree)
+        self._update_current_pane(tree)
 
         # Update status bar
         status_bar = self.query_one("#status-bar", StatusBar)
@@ -453,7 +459,11 @@ class MuxpilotApp(App[str | None]):
                 yield command
 
     async def on_unmount(self) -> None:
-        """Clean up NotifyChannel on app exit."""
+        """Clean up timers and NotifyChannel on app exit."""
+        if self._poll_timer is not None:
+            self._poll_timer.stop()
+        if self._retry_timer is not None:
+            self._retry_timer.stop()
         await self._notify_channel.stop()
 
 
