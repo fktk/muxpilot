@@ -141,7 +141,7 @@ class MuxpilotApp(App[str | None]):
         """Initialize the app after mounting."""
         if not self._client.is_inside_tmux():
             # Still allow running for development, but show a warning
-            pass
+            self._notify_channel.send("Warning: not running inside a tmux session")
 
         self._current_pane_id = self._client.get_current_pane_id()
         await self._do_refresh()

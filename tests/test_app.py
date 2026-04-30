@@ -60,6 +60,17 @@ async def test_tree_populated_on_mount():
         assert len(tw._pane_map) > 0
 
 
+@pytest.mark.asyncio
+async def test_shows_warning_when_not_in_tmux():
+    """App should show a warning when launched outside a tmux session."""
+    app = _patched_app()
+    app._client.is_inside_tmux = MagicMock(return_value=False)
+    async with app.run_test() as pilot:
+        await pilot.pause(0.1)
+        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
+        assert any("not running inside a tmux session" in m.lower() for m in messages)
+
+
 # ============================================================================
 # Navigation
 # ============================================================================
