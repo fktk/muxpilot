@@ -108,6 +108,8 @@ class MuxpilotApp(App[str | None]):
         self._name_filter: str = ""
         self._notify_channel = NotifyChannel()
         self._label_store = LabelStore()
+        if self._watcher._config_error:
+            self._notify_channel.send(f"Config error: {self._watcher._config_error}")
         self._rename_key: str | None = None
         self._poll_backoff = POLL_INTERVAL_SECONDS
         self._poll_timer = None
