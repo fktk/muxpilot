@@ -295,6 +295,12 @@ class MuxpilotApp(App[str | None]):
         """Show help (? key)."""
         self.push_screen(HelpScreen())
 
+    def action_quit(self) -> None:
+        """Quit the app, unless the help screen is open."""
+        if isinstance(self.screen, HelpScreen):
+            return
+        self.exit()
+
     async def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
         if event.input.id == "filter-input":
