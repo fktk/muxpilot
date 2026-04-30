@@ -12,6 +12,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Static, Input
 
+from muxpilot.controllers import FilterState, PollingController, RenameController
 from muxpilot.label_store import LabelStore
 from muxpilot.models import TmuxTree, PaneStatus
 from muxpilot.notify_channel import NotifyChannel
@@ -104,20 +105,103 @@ class MuxpilotApp(App[str | None]):
     def __init__(self) -> None:
         super().__init__()
         self._client = TmuxClient()
-        self._watcher = TmuxWatcher(self._client)
+        self._watcher_instance = TmuxWatcher(self._client)
         self._current_pane_id: str | None = None
         self._navigate_to: str | None = None
-        self._status_filter: set[PaneStatus] | None = None
-        self._name_filter: str = ""
-        self._notify_channel = NotifyChannel()
-        self._label_store = LabelStore()
+        self._notify_channel_instance = NotifyChannel()
+        self._label_store_instance = LabelStore()
         self._notify_config_error()
 
-        self._rename_key: str | None = None
-        self._poll_backoff = self._watcher.poll_interval
-        self._poll_timer = None
-        self._retry_timer = None
-        self.theme = self._label_store.get_theme()
+        self._filter_state = FilterState()
+        self._rename_controller = RenameController(self._label_store_instance)
+        self._polling = PollingController(
+            self, self._watcher_instance, self._notify_channel_instance
+        )
+        self.theme = self._label_store_instance.get_theme()
+
+    # --- managed properties that recreate controllers on change ---
+    @property
+    def _watcher(self):
+        return self._watcher_instance
+
+    @_watcher.setter
+    def _watcher(self, value) -> None:
+        self._watcher_instance = value
+        if hasattr(self, "_polling"):
+            self._polling = PollingController(
+                self, value, self._notify_channel_instance
+            )
+
+    @property
+    def _notify_channel(self):
+        return self._notify_channel_instance
+
+    @_notify_channel.setter
+    def _notify_channel(self, value) -> None:
+        self._notify_channel_instance = value
+        if hasattr(self, "_polling"):
+            self._polling = PollingController(
+                self, self._watcher_instance, value
+            )
+
+    @property
+    def _label_store(self):
+        return self._label_store_instance
+
+    @_label_store.setter
+    def _label_store(self, value) -> None:
+        self._label_store_instance = value
+        if hasattr(self, "_rename_controller"):
+            self._rename_controller = RenameController(value)
+
+    # --- backward-compatible property delegates for tests ---
+    @property
+    def _status_filter(self) -> set[PaneStatus] | None:
+        return self._filter_state.status_filter
+
+    @_status_filter.setter
+    def _status_filter(self, value: set[PaneStatus] | None) -> None:
+        self._filter_state.status_filter = value
+
+    @property
+    def _name_filter(self) -> str:
+        return self._filter_state.name_filter
+
+    @_name_filter.setter
+    def _name_filter(self, value: str) -> None:
+        self._filter_state.name_filter = value
+
+    @property
+    def _rename_key(self) -> str | None:
+        return self._rename_controller.key
+
+    @_rename_key.setter
+    def _rename_key(self, value: str | None) -> None:
+        self._rename_controller.key = value
+
+    @property
+    def _poll_backoff(self) -> float:
+        return self._polling.backoff
+
+    @_poll_backoff.setter
+    def _poll_backoff(self, value: float) -> None:
+        self._polling.backoff = value
+
+    @property
+    def _poll_timer(self):
+        return self._polling.poll_timer
+
+    @_poll_timer.setter
+    def _poll_timer(self, value) -> None:
+        self._polling.poll_timer = value
+
+    @property
+    def _retry_timer(self):
+        return self._polling.retry_timer
+
+    @_retry_timer.setter
+    def _retry_timer(self, value) -> None:
+        self._polling.retry_timer = value
 
     def watch_theme(self, theme: str) -> None:
         """Save theme to config when it changes."""
@@ -152,7 +236,7 @@ class MuxpilotApp(App[str | None]):
         await self._do_refresh()
 
         # Start the polling timer
-        self._poll_timer = self.set_interval(self._watcher.poll_interval, self._poll_tmux)
+        self._polling.start()
 
         # Set initial focus to the tree to avoid the hidden input capturing keys
         self.query_one("#tmux-tree").focus()
@@ -188,29 +272,21 @@ class MuxpilotApp(App[str | None]):
         await self._update_ui_from_poll(tree, events, rebuild_tree=True)
 
     async def _poll_tmux(self) -> None:
-        """Periodic polling callback."""
-        try:
-            tree, events = await asyncio.to_thread(self._watcher.poll)
-        except Exception as e:
-            self._notify_channel.send(f"tmux poll failed: {e}; retrying in {self._poll_backoff}s")
-            self._poll_backoff = min(self._poll_backoff * 2, MAX_POLL_BACKOFF_SECONDS)
-            if self._poll_timer is not None:
-                self._poll_timer.pause()
-            if self._retry_timer is not None:
-                self._retry_timer.stop()
-            self._retry_timer = self.set_interval(self._poll_backoff, self._poll_tmux, repeat=False)
+        """Backward-compatible alias for the periodic polling callback."""
+        await self._on_poll_tick()
+
+    async def _on_poll_tick(self) -> None:
+        """Periodic polling callback — delegates to PollingController."""
+        result = await self._polling.tick()
+        if result is None:
             return
-
-        self._poll_backoff = self._watcher.poll_interval  # reset on success
-        if self._poll_timer is not None:
-            self._poll_timer.resume()
-
+        tree, events = result
         await self._update_ui_from_poll(tree, events, rebuild_tree=bool(events))
 
     async def _update_ui_from_poll(
         self,
         tree: TmuxTree,
-        events: list[TmuxEvent],
+        events: list,
         *,
         rebuild_tree: bool = True,
     ) -> None:
@@ -304,28 +380,19 @@ class MuxpilotApp(App[str | None]):
 
     async def action_filter_errors(self) -> None:
         """Filter to show only error panes (e key)."""
-        if self._status_filter == {PaneStatus.ERROR}:
-            self._status_filter = None
-            self._notify_channel.send("Error filter removed")
-        else:
-            self._status_filter = {PaneStatus.ERROR}
-            self._notify_channel.send("Filtering by errors")
+        msg = self._filter_state.toggle_error()
+        self._notify_channel.send(msg)
         await self._do_refresh()
 
     async def action_filter_waiting(self) -> None:
         """Filter to show only waiting panes (w key)."""
-        if self._status_filter == {PaneStatus.WAITING_INPUT}:
-            self._status_filter = None
-            self._notify_channel.send("Waiting filter removed")
-        else:
-            self._status_filter = {PaneStatus.WAITING_INPUT}
-            self._notify_channel.send("Filtering by waiting")
+        msg = self._filter_state.toggle_waiting()
+        self._notify_channel.send(msg)
         await self._do_refresh()
 
     async def action_filter_all(self) -> None:
         """Clear all filters (a key)."""
-        self._status_filter = None
-        self._name_filter = ""
+        self._filter_state.clear_all()
         filter_input = self.query_one("#filter-input", Input)
         filter_input.value = ""
         filter_input.remove_class("-active")
@@ -336,34 +403,18 @@ class MuxpilotApp(App[str | None]):
         """Start renaming the currently selected tree node (n key)."""
         tw = self.query_one("#tmux-tree", TmuxTreeView)
         data = tw.get_cursor_node_data()
-        if data is None:
-            return
-
-        node_type, session, window, pane = data
-
-        if node_type == "session" and session:
-            self._rename_key = session.session_name
-        elif node_type == "window" and session and window:
-            self._rename_key = f"{session.session_name}.{window.window_index}"
-        elif node_type == "pane" and session and window and pane:
-            self._rename_key = f"{session.session_name}.{window.window_index}.{pane.pane_index}"
-        else:
+        current = self._rename_controller.start(data)
+        if current is None:
             return
 
         rename_input = self.query_one("#rename-input", Input)
-        rename_input.value = self._label_store.get(self._rename_key)
+        rename_input.value = current
         rename_input.add_class("-active")
         rename_input.focus()
 
     async def _finish_rename(self, value: str) -> None:
         """Save the rename and close the input."""
-        if self._rename_key is not None:
-            if value:
-                self._label_store.set(self._rename_key, value)
-            else:
-                self._label_store.delete(self._rename_key)
-            self._rename_key = None
-
+        self._rename_controller.finish(value)
         rename_input = self.query_one("#rename-input", Input)
         rename_input.value = ""
         rename_input.remove_class("-active")
@@ -372,7 +423,7 @@ class MuxpilotApp(App[str | None]):
 
     def _cancel_rename(self) -> None:
         """Cancel rename without saving."""
-        self._rename_key = None
+        self._rename_controller.cancel()
         rename_input = self.query_one("#rename-input", Input)
         rename_input.value = ""
         rename_input.remove_class("-active")
@@ -444,10 +495,7 @@ class MuxpilotApp(App[str | None]):
 
     async def on_unmount(self) -> None:
         """Clean up timers and NotifyChannel on app exit."""
-        if self._poll_timer is not None:
-            self._poll_timer.stop()
-        if self._retry_timer is not None:
-            self._retry_timer.stop()
+        self._polling.stop()
         await self._notify_channel.stop()
 
 
