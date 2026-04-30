@@ -102,6 +102,27 @@ async def test_navigate_to_pane():
         app._client.navigate_to.assert_called_once_with("%0")
 
 
+@pytest.mark.asyncio
+async def test_back_navigation_returns_to_previous_pane():
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0"),
+            make_pane(pane_id="%1"),
+        ])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%0")
+    async with app.run_test() as pilot:
+        # Jump to %1
+        await app.on_tmux_tree_view_pane_activated(
+            TmuxTreeView.PaneActivated(pane_id="%1")
+        )
+        assert app._previous_pane_id == "%0"
+        # Press b to go back
+        app._client.navigate_to.reset_mock()
+        await pilot.press("b")
+        app._client.navigate_to.assert_called_once_with("%0")
+
+
 # ============================================================================
 # Keyboard: quit and refresh
 # ============================================================================

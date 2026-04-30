@@ -98,6 +98,7 @@ class MuxpilotApp(App[str | None]):
         Binding("c", "filter_all", "Show all"),
         Binding("n", "rename", "Rename"),
         Binding("x", "kill_pane", "Kill pane"),
+        Binding("b", "back", "Back"),
     ]
 
     def __init__(self) -> None:
@@ -105,6 +106,7 @@ class MuxpilotApp(App[str | None]):
         self._client = TmuxClient()
         self._watcher = TmuxWatcher(self._client)
         self._current_pane_id: str | None = None
+        self._previous_pane_id: str | None = None
         self._navigate_to: str | None = None
         self._status_filter: set[PaneStatus] | None = None
         self._name_filter: str = ""
@@ -273,6 +275,7 @@ class MuxpilotApp(App[str | None]):
             self._notify_channel.send("This is the current pane")
             return
 
+        self._previous_pane_id = self._current_pane_id
         success = self._client.navigate_to(pane_id)
         if success:
             self._notify_channel.send(f"Navigated to {pane_id}")
@@ -284,6 +287,18 @@ class MuxpilotApp(App[str | None]):
         """Manual refresh (r key)."""
         await self._do_refresh()
         self._notify_channel.send("Refreshed")
+
+    async def action_back(self) -> None:
+        """Navigate back to the previous pane (b key)."""
+        if self._previous_pane_id:
+            success = self._client.navigate_to(self._previous_pane_id)
+            if success:
+                self._notify_channel.send("Returned to previous pane")
+                await self._do_refresh()
+            else:
+                self._notify_channel.send("Previous pane no longer exists")
+        else:
+            self._notify_channel.send("No previous pane to return to")
 
     def action_help(self) -> None:
         """Show help (? key)."""
