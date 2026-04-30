@@ -13,6 +13,7 @@ from textual.widgets import Footer, Header, Static, Input
 from muxpilot.label_store import LabelStore
 from muxpilot.models import TmuxTree, PaneStatus
 from muxpilot.notify_channel import NotifyChannel
+from muxpilot.screens.help_screen import HelpScreen
 from muxpilot.screens.kill_modal import KillPaneModalScreen
 from muxpilot.tmux_client import TmuxClient
 from muxpilot.watcher import TmuxWatcher
@@ -280,7 +281,7 @@ class MuxpilotApp(App[str | None]):
 
     def action_help(self) -> None:
         """Show help (? key)."""
-        self._notify_channel.send("j/k: Navigate  Enter: Go to pane  r: Refresh  /: Filter  e: Errors  w: Waiting  c: Clear filters  a: Collapse/Expand all  n: Rename  q: Quit")
+        self.push_screen(HelpScreen())
 
     async def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
