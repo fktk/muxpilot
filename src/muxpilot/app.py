@@ -23,7 +23,6 @@ from muxpilot.widgets.status_bar import StatusBar
 from muxpilot.widgets.tree_view import TmuxTreeView
 
 
-POLL_INTERVAL_SECONDS = 2.0
 MAX_POLL_BACKOFF_SECONDS = 30.0
 NOTIFY_CHECK_INTERVAL = 0.5
 

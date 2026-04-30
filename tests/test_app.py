@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from muxpilot.models import PaneStatus
-from muxpilot.app import MuxpilotApp, POLL_INTERVAL_SECONDS, MAX_POLL_BACKOFF_SECONDS
+from muxpilot.app import MuxpilotApp, MAX_POLL_BACKOFF_SECONDS
+from muxpilot.watcher import DEFAULT_POLL_INTERVAL
 from muxpilot.widgets.tree_view import TmuxTreeView
 
 from conftest import make_mock_client, make_mock_notify_channel, make_pane, make_session, make_tree, make_window
@@ -931,7 +932,7 @@ async def test_poll_tmux_pauses_timer_on_exception():
             await app._poll_tmux()
         app._poll_timer.pause.assert_called_once()
         mock_set_interval.assert_called_once_with(
-            POLL_INTERVAL_SECONDS * 2, app._poll_tmux, repeat=False
+            DEFAULT_POLL_INTERVAL * 2, app._poll_tmux, repeat=False
         )
 
 
@@ -945,13 +946,13 @@ async def test_poll_tmux_backoff_doubles_after_failure():
     async with app.run_test() as pilot:
         app._poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
-        assert app._poll_backoff == POLL_INTERVAL_SECONDS
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL
         with patch.object(app, "set_interval"):
             await app._poll_tmux()
-        assert app._poll_backoff == POLL_INTERVAL_SECONDS * 2
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 2
         with patch.object(app, "set_interval"):
             await app._poll_tmux()
-        assert app._poll_backoff == POLL_INTERVAL_SECONDS * 4
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 4
 
 
 @pytest.mark.asyncio
@@ -994,7 +995,7 @@ async def test_poll_tmux_resumes_timer_on_recovery():
         with patch.object(app, "set_interval"):
             await app._poll_tmux()
         app._poll_timer.pause.assert_called_once()
-        assert app._poll_backoff == POLL_INTERVAL_SECONDS * 2
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 2
         await app._poll_tmux()
         app._poll_timer.resume.assert_called_once()
-        assert app._poll_backoff == POLL_INTERVAL_SECONDS
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL
