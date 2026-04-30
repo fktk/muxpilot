@@ -155,6 +155,18 @@ async def test_filter_input_toggle():
         assert not fi.has_class("-active")
 
 
+@pytest.mark.asyncio
+async def test_escape_closes_filter_input():
+    """Pressing Escape should close the active filter input."""
+    from textual.widgets import Input
+    app = _patched_app()
+    async with app.run_test() as pilot:
+        await pilot.press("slash")
+        assert app.query_one("#filter-input", Input).has_class("-active")
+        await pilot.press("escape")
+        assert not app.query_one("#filter-input", Input).has_class("-active")
+
+
 # ============================================================================
 # Filter: status filters (e / w / a) — call actions directly
 # ============================================================================

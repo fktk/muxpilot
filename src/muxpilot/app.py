@@ -428,10 +428,21 @@ class MuxpilotApp(App[str | None]):
         )
 
     async def on_key(self, event) -> None:
-        """Handle Escape key during rename."""
+        """Handle Escape key during rename or filter."""
         rename_input = self.query_one("#rename-input", Input)
         if event.key == "escape" and rename_input.has_class("-active"):
             self._cancel_rename()
+            event.prevent_default()
+            event.stop()
+            return
+
+        filter_input = self.query_one("#filter-input", Input)
+        if event.key == "escape" and filter_input.has_class("-active"):
+            filter_input.remove_class("-active")
+            filter_input.value = ""
+            self._name_filter = ""
+            await self._do_refresh()
+            self.query_one("#tmux-tree").focus()
             event.prevent_default()
             event.stop()
 
