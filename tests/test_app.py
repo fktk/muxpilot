@@ -71,7 +71,7 @@ async def test_navigate_self_shows_warning():
     app = _patched_app(tree=tree, current_pane_id="%5")
     async with app.run_test():
         msg = TmuxTreeView.PaneActivated(pane_id="%5")
-        app.on_tmux_tree_view_pane_activated(msg)
+        await app.on_tmux_tree_view_pane_activated(msg)
         app._client.navigate_to.assert_not_called()
 
 
@@ -84,7 +84,7 @@ async def test_navigate_to_pane():
     app = _patched_app(tree=tree, current_pane_id="%99")
     async with app.run_test():
         msg = TmuxTreeView.PaneActivated(pane_id="%0")
-        app.on_tmux_tree_view_pane_activated(msg)
+        await app.on_tmux_tree_view_pane_activated(msg)
         app._client.navigate_to.assert_called_once_with("%0")
 
 

@@ -83,6 +83,7 @@ class TmuxWatcher:
                 pass
 
         self._last_tree: TmuxTree | None = None
+        self._last_poll_time: float | None = None
 
     def poll(self) -> tuple[TmuxTree, list[TmuxEvent]]:
         """
@@ -102,6 +103,7 @@ class TmuxWatcher:
         # Analyze pane outputs and detect status changes
         current_pane_id = self.client.get_current_pane_id()
         now = time.time()
+        poll_elapsed = now - self._last_poll_time if self._last_poll_time is not None else 0.0
 
         for pane in new_tree.all_panes():
             # Skip our own pane
@@ -111,7 +113,7 @@ class TmuxWatcher:
 
             content = self.client.capture_pane_content(pane.pane_id, self.capture_lines)
             old_activity = self.activities.get(pane.pane_id)
-            new_activity = self._analyze_pane(pane.pane_id, content, old_activity, now)
+            new_activity = self._analyze_pane(pane.pane_id, content, old_activity, poll_elapsed)
 
             # Check for status change
             if old_activity and old_activity.status != new_activity.status:
@@ -135,6 +137,7 @@ class TmuxWatcher:
                 del self.activities[pane_id]
 
         self._last_tree = new_tree
+        self._last_poll_time = now
         return new_tree, events
 
     def _analyze_pane(
@@ -142,7 +145,7 @@ class TmuxWatcher:
         pane_id: str,
         content: list[str],
         old_activity: PaneActivity | None,
-        now: float,
+        poll_elapsed: float,
     ) -> PaneActivity:
         """Analyze pane content and determine its status."""
         content_str = "\n".join(content)
@@ -151,7 +154,7 @@ class TmuxWatcher:
 
         # Determine if content has changed
         if old_activity and old_activity.last_content_hash == content_hash:
-            idle_seconds = old_activity.idle_seconds + (now - (self._last_tree.timestamp if self._last_tree else now))
+            idle_seconds = old_activity.idle_seconds + poll_elapsed
         else:
             idle_seconds = 0.0
 
