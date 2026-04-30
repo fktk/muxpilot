@@ -18,6 +18,7 @@ from muxpilot.screens.kill_modal import KillPaneModalScreen
 from muxpilot.tmux_client import TmuxClient
 from muxpilot.watcher import TmuxWatcher
 from muxpilot.widgets.detail_panel import DetailPanel
+from muxpilot.widgets.filter_bar import FilterBar
 from muxpilot.widgets.status_bar import StatusBar
 from muxpilot.widgets.tree_view import TmuxTreeView
 
@@ -133,6 +134,7 @@ class MuxpilotApp(App[str | None]):
             with Vertical(id="tree-panel"):
                 yield Input(placeholder="Filter by name...", id="filter-input")
                 yield Input(placeholder="New name (empty to reset)...", id="rename-input")
+                yield FilterBar(id="filter-bar")
                 yield TmuxTreeView(id="tmux-tree")
             yield DetailPanel(id="detail-panel")
         yield StatusBar(id="status-bar")
@@ -199,6 +201,10 @@ class MuxpilotApp(App[str | None]):
             name_filter=self._name_filter
         )
         
+        # Update filter bar
+        filter_bar = self.query_one("#filter-bar", FilterBar)
+        filter_bar.update(self._status_filter, self._name_filter)
+
         # Update status bar
         status_bar = self.query_one("#status-bar", StatusBar)
         status_bar.update_stats(tree)
