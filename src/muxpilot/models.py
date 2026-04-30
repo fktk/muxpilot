@@ -20,10 +20,10 @@ class PaneStatus(Enum):
 # ステータスに対応するアイコン
 STATUS_ICONS: dict[PaneStatus, str] = {
     PaneStatus.ACTIVE: "●",
-    PaneStatus.IDLE: "◌",
-    PaneStatus.WAITING_INPUT: "⏳",
-    PaneStatus.ERROR: "🔴",
-    PaneStatus.COMPLETED: "✅",
+    PaneStatus.IDLE: "○",
+    PaneStatus.WAITING_INPUT: "◆",
+    PaneStatus.ERROR: "▲",
+    PaneStatus.COMPLETED: "■",
     PaneStatus.UNKNOWN: "?",
 }
 

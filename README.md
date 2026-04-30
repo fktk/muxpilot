@@ -23,10 +23,10 @@ It is designed specifically for **AI agent orchestration** and managing tasks ru
   | Icon | Status | Detection Condition |
   |:---:|---|---|
   | `●` | ACTIVE | Pane output changed since last poll (command running, log output, etc.) |
-  | `◌` | IDLE | Not a prompt, but output hasn't changed for more than a certain time (default 10 seconds) |
-  | `⏳` | WAITING | Last line matches a prompt pattern and idle time exceeds threshold (waiting for user input) |
-  | `🔴` | ERROR | Error pattern (`Traceback`, `Error:`, `FAILED`, etc.) detected in the last 10 lines |
-  | `✅` | COMPLETED | Last line matches a prompt pattern and idle time is within threshold (right after command completion) |
+  | `○` | IDLE | Not a prompt, but output hasn't changed for more than a certain time (default 10 seconds) |
+  | `◆` | WAITING | Last line matches a prompt pattern and idle time exceeds threshold (waiting for user input) |
+  | `▲` | ERROR | Error pattern (`Traceback`, `Error:`, `FAILED`, etc.) detected in the last 10 lines |
+  | `■` | COMPLETED | Last line matches a prompt pattern and idle time is within threshold (right after command completion) |
 
   Status is determined in priority order: **ERROR → COMPLETED / WAITING → IDLE → ACTIVE**.
 
@@ -80,8 +80,8 @@ See `config.example.toml` for more details.
 | `a` | Collapse / expand all nodes (toggle) |
 | `r` | Manual refresh |
 | `/` | Toggle filter input on/off |
-| `e` | Show only error (🔴) panes |
-| `w` | Show only waiting (⏳) panes |
+| `e` | Show only error (▲) panes |
+| `w` | Show only waiting (◆) panes |
 | `c` | Clear filters and show all |
 | `n` | Rename the selected node (custom label) |
 | `?` | Show help |

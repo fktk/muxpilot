@@ -25,6 +25,19 @@ from conftest import make_pane, make_session, make_tree, make_window
 # ============================================================================
 
 
+def test_status_icons_are_unified_geometric_symbols():
+    """STATUS_ICONS should use consistent geometric symbols, not mixed emoji."""
+    expected = {
+        PaneStatus.ACTIVE: "●",
+        PaneStatus.IDLE: "○",
+        PaneStatus.WAITING_INPUT: "◆",
+        PaneStatus.ERROR: "▲",
+        PaneStatus.COMPLETED: "■",
+        PaneStatus.UNKNOWN: "?",
+    }
+    assert STATUS_ICONS == expected
+
+
 class TestPaneInfoDisplayLabel:
     """Tests for PaneInfo.display_label property."""
 
