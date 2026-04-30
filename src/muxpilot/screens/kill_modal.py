@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Awaitable, Callable
-
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
@@ -46,12 +45,10 @@ class KillPaneModalScreen(ModalScreen[bool]):
         self,
         pane_id: str,
         pane_label: str = "",
-        on_confirm: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         super().__init__()
         self.pane_id = pane_id
         self.pane_label = pane_label or pane_id
-        self._on_confirm = on_confirm
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -67,7 +64,7 @@ class KillPaneModalScreen(ModalScreen[bool]):
         else:
             self.dismiss(False)
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: events.Key) -> None:
         if event.key in ("y", "enter"):
             self.dismiss(True)
             event.stop()

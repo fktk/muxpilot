@@ -34,6 +34,7 @@ async def test_kill_modal_confirms_with_enter():
     screen = KillPaneModalScreen("%0")
     async with app.run_test() as pilot:
         app.push_screen(screen, callback)
+        screen.focus()  # defocus button so Enter hits screen-level on_key
         await pilot.press("enter")
         assert result == [True]
 

@@ -432,7 +432,7 @@ async def test_kill_pane_key_shows_modal():
         await pilot.press("j")
         await pilot.pause()
 
-        await app.action_kill_pane()
+        app.action_kill_pane()
         await pilot.pause()
 
         assert isinstance(app.screen, KillPaneModalScreen)
@@ -453,7 +453,7 @@ async def test_kill_pane_confirm_y_kills():
         await pilot.press("j")
         await pilot.pause()
 
-        await app.action_kill_pane()
+        app.action_kill_pane()
         await pilot.pause()
 
         app._notify_channel.send.reset_mock()
@@ -478,7 +478,7 @@ async def test_kill_pane_confirm_enter_kills():
         await pilot.press("j")
         await pilot.pause()
 
-        await app.action_kill_pane()
+        app.action_kill_pane()
         await pilot.pause()
 
         app._notify_channel.send.reset_mock()
@@ -503,7 +503,7 @@ async def test_kill_pane_cancel_n():
         await pilot.press("j")
         await pilot.pause()
 
-        await app.action_kill_pane()
+        app.action_kill_pane()
         await pilot.pause()
 
         await pilot.press("n")
@@ -527,7 +527,7 @@ async def test_kill_pane_cancel_escape():
         await pilot.press("j")
         await pilot.pause()
 
-        await app.action_kill_pane()
+        app.action_kill_pane()
         await pilot.pause()
 
         await pilot.press("escape")
@@ -553,7 +553,7 @@ async def test_kill_pane_self_not_allowed():
         await pilot.press("j")
         await pilot.pause()
 
-        await app.action_kill_pane()
+        app.action_kill_pane()
         await pilot.pause()
 
         app._client.kill_pane.assert_not_called()

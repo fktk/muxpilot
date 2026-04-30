@@ -379,7 +379,7 @@ class MuxpilotApp(App[str | None]):
         rename_input.remove_class("-active")
         self.query_one("#tmux-tree").focus()
 
-    async def action_kill_pane(self) -> None:
+    def action_kill_pane(self) -> None:
         """Show modal to confirm killing the currently selected pane (x key)."""
         tw = self.query_one("#tmux-tree", TmuxTreeView)
         node = tw.cursor_node
