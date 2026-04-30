@@ -57,5 +57,5 @@ tests/
 
 ## 設定ファイル
 
-`~/.config/muxpilot/config.toml` に watcher のパターンや idle_threshold を設定できる。
+`~/.config/muxpilot/config.toml` に watcher のパターンを設定できる。
 `config.example.toml` を参照。設定値はデフォルトを完全に置き換える（マージではない）。
