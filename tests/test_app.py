@@ -23,7 +23,7 @@ def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error
     app._notify_channel = make_mock_notify_channel()
     if config_error is not None:
         app._watcher._config_error = config_error
-        app._notify_channel.send(f"Config error: {config_error}")
+        app._notify_config_error()
     if label_store is not None:
         app._label_store = label_store
     return app

@@ -108,8 +108,8 @@ class MuxpilotApp(App[str | None]):
         self._name_filter: str = ""
         self._notify_channel = NotifyChannel()
         self._label_store = LabelStore()
-        if self._watcher._config_error:
-            self._notify_channel.send(f"Config error: {self._watcher._config_error}")
+        self._notify_config_error()
+
         self._rename_key: str | None = None
         self._poll_backoff = POLL_INTERVAL_SECONDS
         self._poll_timer = None
@@ -120,6 +120,11 @@ class MuxpilotApp(App[str | None]):
         """Save theme to config when it changes."""
         if hasattr(self, "_label_store"):
             self._label_store.set_theme(theme)
+
+    def _notify_config_error(self) -> None:
+        """Send config error from watcher to the notify channel."""
+        if self._watcher._config_error:
+            self._notify_channel.send(f"Config error: {self._watcher._config_error}")
 
     def compose(self) -> ComposeResult:
         yield Header()
