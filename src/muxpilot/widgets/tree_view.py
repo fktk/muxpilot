@@ -52,6 +52,13 @@ class TmuxTreeView(Tree[Text]):
         self._selected_path: str | None = None
         self._has_populated: bool = False
 
+    def get_cursor_node_data(self) -> tuple[str, SessionInfo | None, WindowInfo | None, PaneInfo | None] | None:
+        """Return the data tuple for the currently cursor-selected node, or None."""
+        node = self.cursor_node
+        if node is None or node == self.root:
+            return None
+        return self._node_data.get(node.id)
+
     def _get_node_path(self, node: TreeNode[Text]) -> str:
         """Generate a unique string path for a node to preserve state."""
         data = self._node_data.get(node.id)
