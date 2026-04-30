@@ -92,29 +92,15 @@ class TmuxClient:
         """
         Navigate to the specified pane.
 
-        Handles cross-session, cross-window navigation:
-        1. Find the pane, its window, and session
-        2. switch-client to the session (if different)
-        3. select the window
-        4. select the pane
+        Uses tmux switch-client with pane_id directly, which handles
+        cross-session, cross-window navigation automatically without
+        relying on cached libtmux objects that may become stale.
         """
-        target_pane = self._find_pane(pane_id)
-        if target_pane is None:
-            return False
-
-        target_window = target_pane.window
-        target_session = target_window.session
-
-        # Switch client to the target session
         try:
-            self.server.cmd("switch-client", "-t", target_session.name)
+            self.server.cmd("switch-client", "-t", pane_id)
+            return True
         except libtmux.exc.LibTmuxException:
-            pass  # Already in this session
-
-        # Select the window, then the pane
-        target_window.select()
-        target_pane.select()
-        return True
+            return False
 
     def kill_pane(self, pane_id: str) -> bool:
         """Kill the specified pane."""

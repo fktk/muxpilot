@@ -176,12 +176,6 @@ class MuxpilotApp(App[str | None]):
                     if label:
                         pane.custom_label = label
 
-    def _update_current_pane(self, tree: TmuxTree) -> None:
-        """Update _current_pane_id from the tree's active pane."""
-        active_pane = next((p for s in tree.sessions for w in s.windows for p in w.panes if p.is_active), None)
-        if active_pane:
-            self._current_pane_id = active_pane.pane_id
-
     async def _do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
         try:
@@ -191,7 +185,6 @@ class MuxpilotApp(App[str | None]):
             return
 
         self._apply_labels(tree)
-        self._update_current_pane(tree)
 
         # Update tree view
         tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
@@ -234,7 +227,6 @@ class MuxpilotApp(App[str | None]):
         if self._poll_timer is not None:
             self._poll_timer.resume()
         self._apply_labels(tree)
-        self._update_current_pane(tree)
 
         # Update status bar
         status_bar = self.query_one("#status-bar", StatusBar)
@@ -302,6 +294,12 @@ class MuxpilotApp(App[str | None]):
     def action_help(self) -> None:
         """Show help (? key)."""
         self.push_screen(HelpScreen())
+
+    def action_quit(self) -> None:
+        """Quit the app, unless the help screen is open."""
+        if isinstance(self.screen, HelpScreen):
+            return
+        self.exit()
 
     async def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""

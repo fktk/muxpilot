@@ -118,28 +118,15 @@ class TestGetTree:
 
 class TestNavigateTo:
     def test_existing(self):
-        p = _mock_pane(pane_id="%0")
-        w = _mock_window(panes=[p])
-        s = _mock_session(windows=[w])
-        c = _client_with([s])
+        c = _client_with([])
         assert c.navigate_to("%0") is True
-        p.select.assert_called_once()
+        c.server.cmd.assert_called_with("switch-client", "-t", "%0")
 
     def test_nonexistent(self):
-        c = _client_with([_mock_session()])
+        import libtmux.exc
+        c = _client_with([])
+        c.server.cmd.side_effect = libtmux.exc.LibTmuxException("not found")
         assert c.navigate_to("%99") is False
-
-    def test_cross_session(self):
-        p2 = _mock_pane(pane_id="%1")
-        w2 = _mock_window(panes=[p2])
-        # session.name is used by navigate_to for switch-client target
-        s2 = _mock_session(sname="s2", windows=[w2], name="s2")
-        # Ensure w2.session and p2.window resolve correctly
-        p2.window = w2
-        w2.session = s2
-        c = _client_with([_mock_session(), s2])
-        c.navigate_to("%1")
-        c.server.cmd.assert_called_with("switch-client", "-t", "s2")
 
 
 class TestCapture:

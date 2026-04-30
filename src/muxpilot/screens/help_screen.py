@@ -55,9 +55,9 @@ class HelpScreen(ModalScreen[None]):
                 ("q", "Quit"),
             ])
             yield table
-            yield Static("Press Esc or q to close", classes="footer")
+            yield Static("Press Esc to close", classes="footer")
 
     def on_key(self, event) -> None:
-        if event.key in ("escape", "q"):
+        if event.key == "escape":
             self.dismiss()
             event.stop()
