@@ -136,6 +136,9 @@ class TmuxTreeView(Tree[Text]):
                 
                 panes_to_add = []
                 for pane in window.panes:
+                    if pane.is_self:
+                        continue
+
                     # Apply status filter
                     if status_filter and pane.status not in status_filter:
                         continue

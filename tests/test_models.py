@@ -84,14 +84,6 @@ class TestPaneInfoDisplayLabel:
         assert "[]" not in pane.display_label
         assert " — " in pane.display_label
 
-    def test_display_label_self_pane_shows_muxpilot(self) -> None:
-        """Self pane should show 'muxpilot' instead of path."""
-        pane = make_pane(is_self=True, current_path="/some/long/path", current_command="python")
-        label = pane.display_label
-        expected_icon = STATUS_ICONS[PaneStatus.UNKNOWN]
-        assert label == f"{expected_icon} muxpilot"
-        assert "/some/long/path" not in label
-
     def test_display_label_non_self_pane_shows_path(self) -> None:
         """Non-self pane should show path as normal."""
         pane = make_pane(is_self=False, current_path="/home/user/project")
@@ -112,12 +104,6 @@ class TestPaneInfoDisplayLabel:
             custom_label="",
         )
         assert "vim" in pane.display_label
-
-    def test_display_label_self_pane_ignores_custom_label(self) -> None:
-        """Self pane should always show [muxpilot] regardless of custom_label."""
-        pane = make_pane(is_self=True, custom_label="something else")
-        assert "muxpilot" in pane.display_label
-        assert "something else" not in pane.display_label
 
     def test_display_label_uses_full_command_when_available(self) -> None:
         """When current_command is a shell and full_command is set, extract the binary name."""

@@ -48,8 +48,6 @@ class PaneInfo:
     def display_label(self) -> str:
         """Label for tree view display."""
         icon = STATUS_ICONS.get(self.status, "?")
-        if self.is_self:
-            return f"{icon} muxpilot"
         if self.custom_label:
             return f"{icon} {self.custom_label}"
 
