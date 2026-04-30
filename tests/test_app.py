@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from muxpilot.models import PaneStatus
-from muxpilot.app import MuxpilotApp
+from muxpilot.app import MuxpilotApp, POLL_INTERVAL_SECONDS, MAX_POLL_BACKOFF_SECONDS
 from muxpilot.widgets.tree_view import TmuxTreeView
 
 from conftest import make_mock_client, make_mock_notify_channel, make_pane, make_session, make_tree, make_window
@@ -788,13 +788,63 @@ async def test_poll_tmux_pauses_timer_on_exception():
     async with app.run_test() as pilot:
         app._poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
-        await app._poll_tmux()
+        with patch.object(app, "set_interval") as mock_set_interval:
+            await app._poll_tmux()
         app._poll_timer.pause.assert_called_once()
+        mock_set_interval.assert_called_once_with(
+            POLL_INTERVAL_SECONDS * 2, app._poll_tmux, repeat=False
+        )
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_backoff_doubles_after_failure():
+    """_poll_backoff should double after each failure."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._poll_timer = MagicMock()
+        app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+        assert app._poll_backoff == POLL_INTERVAL_SECONDS
+        with patch.object(app, "set_interval"):
+            await app._poll_tmux()
+        assert app._poll_backoff == POLL_INTERVAL_SECONDS * 2
+        with patch.object(app, "set_interval"):
+            await app._poll_tmux()
+        assert app._poll_backoff == POLL_INTERVAL_SECONDS * 4
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_backoff_caps_at_max():
+    """_poll_backoff should not exceed MAX_POLL_BACKOFF_SECONDS."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._poll_timer = MagicMock()
+        app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+        # Seed backoff so next doubling would exceed the cap
+        app._poll_backoff = MAX_POLL_BACKOFF_SECONDS - 1.0
+        with patch.object(app, "set_interval") as mock_set_interval:
+            await app._poll_tmux()
+        assert app._poll_backoff == MAX_POLL_BACKOFF_SECONDS
+        mock_set_interval.assert_called_once_with(
+            MAX_POLL_BACKOFF_SECONDS, app._poll_tmux, repeat=False
+        )
+        # Another failure should stay at the cap
+        with patch.object(app, "set_interval") as mock_set_interval:
+            await app._poll_tmux()
+        assert app._poll_backoff == MAX_POLL_BACKOFF_SECONDS
+        mock_set_interval.assert_called_once_with(
+            MAX_POLL_BACKOFF_SECONDS, app._poll_tmux, repeat=False
+        )
 
 
 @pytest.mark.asyncio
 async def test_poll_tmux_resumes_timer_on_recovery():
-    """After a polling failure, success should resume the repeating timer."""
+    """After a polling failure, success should resume the repeating timer and reset backoff."""
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
     ])
@@ -802,7 +852,10 @@ async def test_poll_tmux_resumes_timer_on_recovery():
     async with app.run_test() as pilot:
         app._poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=[RuntimeError("tmux down"), (tree, [])])
-        await app._poll_tmux()
+        with patch.object(app, "set_interval"):
+            await app._poll_tmux()
         app._poll_timer.pause.assert_called_once()
+        assert app._poll_backoff == POLL_INTERVAL_SECONDS * 2
         await app._poll_tmux()
         app._poll_timer.resume.assert_called_once()
+        assert app._poll_backoff == POLL_INTERVAL_SECONDS
