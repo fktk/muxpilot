@@ -50,6 +50,7 @@ class TmuxTreeView(Tree[Text]):
         self._node_data: dict[int, tuple[str, SessionInfo | None, WindowInfo | None, PaneInfo | None]] = {}
         self._expanded_paths: set[str] = set()
         self._selected_path: str | None = None
+        self._has_populated: bool = False
 
     def _get_node_path(self, node: TreeNode[Text]) -> str:
         """Generate a unique string path for a node to preserve state."""
@@ -96,6 +97,8 @@ class TmuxTreeView(Tree[Text]):
                 path = self._get_node_path(node)
                 if path in self._expanded_paths:
                     node.expand()
+                else:
+                    node.collapse()
                 if path == self._selected_path:
                     target_cursor_node = node
             nodes_to_check.extend(node.children)
@@ -180,10 +183,12 @@ class TmuxTreeView(Tree[Text]):
                         self._pane_map[pane.pane_id] = (session, window, pane)
 
         # Restore state after populating
-        if not self._expanded_paths:
+        if not self._has_populated:
             self.root.expand_all()
         else:
             self._restore_state()
+
+        self._has_populated = True
 
     def action_toggle_expand(self) -> None:
         """Toggle collapse/expand on ALL expandable nodes in the tree."""
