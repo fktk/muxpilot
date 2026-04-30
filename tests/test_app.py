@@ -416,8 +416,10 @@ async def test_structural_events_still_notified():
 
 
 @pytest.mark.asyncio
-async def test_kill_pane_key_starts_confirm():
-    """Pressing x on a pane node should start kill confirmation."""
+async def test_kill_pane_key_shows_modal():
+    """Pressing x on a pane node should push KillPaneModalScreen."""
+    from muxpilot.screens.kill_modal import KillPaneModalScreen
+
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -430,18 +432,15 @@ async def test_kill_pane_key_starts_confirm():
         await pilot.press("j")
         await pilot.pause()
 
-        app.action_kill_pane()
+        await app.action_kill_pane()
         await pilot.pause()
 
-        assert app._kill_pane_id == "%0"
-        # Notification should ask for confirmation
-        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
-        assert any("Kill pane %0? (y/n)" in m for m in messages)
+        assert isinstance(app.screen, KillPaneModalScreen)
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_confirm_y_kills():
-    """Pressing y during kill confirmation should call kill_pane."""
+    """Confirming the kill modal with y should call kill_pane."""
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -454,7 +453,7 @@ async def test_kill_pane_confirm_y_kills():
         await pilot.press("j")
         await pilot.pause()
 
-        app.action_kill_pane()
+        await app.action_kill_pane()
         await pilot.pause()
 
         app._notify_channel.send.reset_mock()
@@ -462,12 +461,11 @@ async def test_kill_pane_confirm_y_kills():
         await pilot.pause()
 
         app._client.kill_pane.assert_called_once_with("%0")
-        assert app._kill_pane_id is None
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_confirm_enter_kills():
-    """Pressing Enter during kill confirmation should also call kill_pane."""
+    """Confirming the kill modal with Enter should also call kill_pane."""
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -480,7 +478,7 @@ async def test_kill_pane_confirm_enter_kills():
         await pilot.press("j")
         await pilot.pause()
 
-        app.action_kill_pane()
+        await app.action_kill_pane()
         await pilot.pause()
 
         app._notify_channel.send.reset_mock()
@@ -488,12 +486,11 @@ async def test_kill_pane_confirm_enter_kills():
         await pilot.pause()
 
         app._client.kill_pane.assert_called_once_with("%0")
-        assert app._kill_pane_id is None
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_cancel_n():
-    """Pressing n during kill confirmation should cancel."""
+    """Pressing n in the kill modal should cancel without killing."""
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -506,19 +503,18 @@ async def test_kill_pane_cancel_n():
         await pilot.press("j")
         await pilot.pause()
 
-        app.action_kill_pane()
+        await app.action_kill_pane()
         await pilot.pause()
 
         await pilot.press("n")
         await pilot.pause()
 
         app._client.kill_pane.assert_not_called()
-        assert app._kill_pane_id is None
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_cancel_escape():
-    """Pressing Escape during kill confirmation should cancel."""
+    """Pressing Escape in the kill modal should cancel without killing."""
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -531,19 +527,20 @@ async def test_kill_pane_cancel_escape():
         await pilot.press("j")
         await pilot.pause()
 
-        app.action_kill_pane()
+        await app.action_kill_pane()
         await pilot.pause()
 
         await pilot.press("escape")
         await pilot.pause()
 
         app._client.kill_pane.assert_not_called()
-        assert app._kill_pane_id is None
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_self_not_allowed():
-    """Pressing x on the current (self) pane should not start confirmation."""
+    """Pressing x on the current (self) pane should not push the modal."""
+    from muxpilot.screens.kill_modal import KillPaneModalScreen
+
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%5")])])
     ])
@@ -556,11 +553,11 @@ async def test_kill_pane_self_not_allowed():
         await pilot.press("j")
         await pilot.pause()
 
-        app.action_kill_pane()
+        await app.action_kill_pane()
         await pilot.pause()
 
         app._client.kill_pane.assert_not_called()
-        assert app._kill_pane_id is None
+        assert not isinstance(app.screen, KillPaneModalScreen)
 
 
 # ============================================================================
