@@ -1,6 +1,11 @@
 # muxpilot configuration example
 # Place this file at ~/.config/muxpilot/config.toml
 
+[app]
+# UI theme. Supported values include:
+#   "textual-dark", "textual-light", "nord", "gruvbox"
+theme = "textual-dark"
+
 [watcher]
 # Prompt patterns (regular expressions)
 # Specifying these completely REPLACES the default patterns.

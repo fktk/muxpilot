@@ -11,7 +11,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_FIFO_PATH = Path.home() / ".muxpilot" / "notify"
+DEFAULT_FIFO_PATH = Path.home() / ".config" / "muxpilot" / "notify"
 
 
 class NotifyChannel:

@@ -68,6 +68,15 @@ idle_threshold = 10.0
 - `error_patterns`: Regex list for detecting errors. **Replaces** the default patterns entirely.
 - `idle_threshold`: Seconds before a pane is considered idle.
 
+### Theme
+
+You can set the UI theme under the `[app]` section:
+
+```toml
+[app]
+theme = "textual-dark"  # or "textual-light", "nord", "gruvbox"
+```
+
 See `config.example.toml` for more details.
 
 ## ⌨️ Keybindings
@@ -102,10 +111,10 @@ muxpilot displays toast notifications in the lower right corner of the screen. T
 
 ### External Notifications
 
-muxpilot monitors a FIFO (named pipe) at `~/.muxpilot/notify` and can receive arbitrary messages from external processes.
+muxpilot monitors a FIFO (named pipe) at `~/.config/muxpilot/notify` and can receive arbitrary messages from external processes.
 
 ```bash
-echo "Build complete!" > ~/.muxpilot/notify
+echo "Build complete!" > ~/.config/muxpilot/notify
 ```
 
 This allows you to display notifications on muxpilot from shell scripts or CI tools.
