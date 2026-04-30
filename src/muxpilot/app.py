@@ -126,8 +126,9 @@ class MuxpilotApp(App[str | None]):
 
     def _notify_config_error(self) -> None:
         """Send config error from watcher to the notify channel."""
-        if self._watcher._config_error:
-            self._notify_channel.send(f"Config error: {self._watcher._config_error}")
+        error = self._watcher.config_error
+        if error:
+            self._notify_channel.send(f"Config error: {error}")
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -345,12 +346,8 @@ class MuxpilotApp(App[str | None]):
     async def action_rename(self) -> None:
         """Start renaming the currently selected tree node (n key)."""
         tw = self.query_one("#tmux-tree", TmuxTreeView)
-        node = tw.cursor_node
-        if node is None or node == tw.root:
-            return
-
-        data = tw._node_data.get(node.id)
-        if not data:
+        data = tw.get_cursor_node_data()
+        if data is None:
             return
 
         node_type, session, window, pane = data
@@ -395,12 +392,8 @@ class MuxpilotApp(App[str | None]):
     def action_kill_pane(self) -> None:
         """Show modal to confirm killing the currently selected pane (x key)."""
         tw = self.query_one("#tmux-tree", TmuxTreeView)
-        node = tw.cursor_node
-        if node is None or node == tw.root:
-            return
-
-        data = tw._node_data.get(node.id)
-        if not data:
+        data = tw.get_cursor_node_data()
+        if data is None:
             return
 
         node_type, session, window, pane = data
