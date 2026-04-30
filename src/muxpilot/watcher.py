@@ -91,6 +91,11 @@ class TmuxWatcher:
         self._last_tree: TmuxTree | None = None
         self._last_poll_time: float | None = None
 
+    @property
+    def config_error(self) -> str | None:
+        """Return the config loading error message, if any."""
+        return self._config_error
+
     def poll(self) -> tuple[TmuxTree, list[TmuxEvent]]:
         """
         Perform one poll cycle:
