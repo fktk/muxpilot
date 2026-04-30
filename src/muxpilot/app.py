@@ -21,6 +21,7 @@ from muxpilot.widgets.tree_view import TmuxTreeView
 
 
 POLL_INTERVAL_SECONDS = 2.0
+MAX_POLL_BACKOFF_SECONDS = 30.0
 NOTIFY_CHECK_INTERVAL = 0.5
 
 
@@ -108,6 +109,7 @@ class MuxpilotApp(App[str | None]):
         self._label_store = LabelStore()
         self._rename_key: str | None = None
         self._kill_pane_id: str | None = None
+        self._poll_backoff = POLL_INTERVAL_SECONDS
         self.theme = self._label_store.get_theme()
 
     def watch_theme(self, theme: str) -> None:
@@ -199,9 +201,13 @@ class MuxpilotApp(App[str | None]):
         """Periodic polling callback."""
         try:
             tree, events = await asyncio.to_thread(self._watcher.poll)
-        except Exception:
+        except Exception as e:
+            self._notify_channel.send(f"tmux poll failed: {e}")
+            self._poll_backoff = min(self._poll_backoff * 2, MAX_POLL_BACKOFF_SECONDS)
+            self.set_interval(self._poll_backoff, self._poll_tmux, repeat=False)
             return
 
+        self._poll_backoff = POLL_INTERVAL_SECONDS  # reset on success
         self._apply_labels(tree)
 
         # Update status bar

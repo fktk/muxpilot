@@ -756,3 +756,23 @@ async def test_rename_escape_cancels(tmp_path):
 
         assert store.get("work.0.0") == ""
         assert not ri.has_class("-active")
+
+
+# ============================================================================
+# Polling: error handling and backoff
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_shows_error_on_exception():
+    """When watcher.poll raises, notify channel should show error and polling continues."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+    async with app.run_test() as pilot:
+        app._notify_channel.send.reset_mock()
+        await app._poll_tmux()
+        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
+        assert any("tmux down" in m for m in messages)
