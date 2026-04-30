@@ -32,10 +32,10 @@ class TestDetermineStatus:
         assert self._status(["output"], "output", idle=0.0) == PaneStatus.ACTIVE
 
     def test_idle_when_no_change(self):
-        assert self._status(["output"], "output", idle=15.0) == PaneStatus.IDLE
+        assert self._status(["output"], "output", idle=15.0) == PaneStatus.ACTIVE
 
     def test_completed_shell_prompt(self):
-        assert self._status(["user@host:~$ "], "user@host:~$ ", idle=0.0) == PaneStatus.COMPLETED
+        assert self._status(["user@host:~$ "], "user@host:~$ ", idle=0.0) == PaneStatus.WAITING_INPUT
 
     def test_waiting_shell_prompt(self):
         assert self._status(["user@host:~$ "], "user@host:~$ ", idle=15.0) == PaneStatus.WAITING_INPUT

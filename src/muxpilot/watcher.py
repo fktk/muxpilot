@@ -202,20 +202,10 @@ class TmuxWatcher:
         # Check if the last line looks like a prompt (waiting for input)
         for pattern in self.prompt_patterns:
             if pattern.search(last_line):
-                if idle_seconds > self.idle_threshold:
-                    return PaneStatus.WAITING_INPUT
-                else:
-                    return PaneStatus.COMPLETED
+                return PaneStatus.WAITING_INPUT
 
-        # Check idle state
-        if idle_seconds > self.idle_threshold:
-            return PaneStatus.IDLE
-
-        # Content is changing = active
-        if idle_seconds == 0.0:
-            return PaneStatus.ACTIVE
-
-        return PaneStatus.IDLE
+        # Default to active
+        return PaneStatus.ACTIVE
 
     def _detect_structural_changes(
         self,

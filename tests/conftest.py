@@ -23,7 +23,7 @@ def make_pane(
     is_active: bool = True,
     width: int = 80,
     height: int = 24,
-    status: PaneStatus = PaneStatus.UNKNOWN,
+    status: PaneStatus = PaneStatus.ACTIVE,
     is_self: bool = False,
     custom_label: str = "",
     full_command: str = "",

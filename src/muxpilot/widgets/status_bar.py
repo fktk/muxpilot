@@ -23,11 +23,8 @@ class StatusBar(Static):
     # Icon legend labels
     _STATUS_LABELS: dict[PaneStatus, str] = {
         PaneStatus.ACTIVE: "active",
-        PaneStatus.IDLE: "idle",
         PaneStatus.WAITING_INPUT: "waiting",
         PaneStatus.ERROR: "error",
-        PaneStatus.COMPLETED: "done",
-        PaneStatus.UNKNOWN: "unknown",
     }
 
     def __init__(self, name: str | None = None, id: str | None = None) -> None:
@@ -50,8 +47,8 @@ class StatusBar(Static):
             status_counts[pane.status] = status_counts.get(pane.status, 0) + 1
 
         parts = [
-            f"📦 {tree.total_sessions}",
-            f"🪟 {tree.total_windows}",
+            f"■ {tree.total_sessions}",
+            f"□ {tree.total_windows}",
             f"▣ {tree.total_panes}",
         ]
 

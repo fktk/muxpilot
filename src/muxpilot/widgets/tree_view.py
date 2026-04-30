@@ -183,7 +183,7 @@ class TmuxTreeView(Tree[Text]):
                     for pane in panes:
                         label_text = Text.from_markup(pane.display_label)
                         if pane.is_active:
-                            label_text.stylize("bold reverse")
+                            label_text.stylize("bold")
 
                         pane_node = window_node.add_leaf(label_text)
                         self._node_data[pane_node.id] = ("pane", session, window, pane)
