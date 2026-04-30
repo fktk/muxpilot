@@ -136,6 +136,9 @@ class TmuxTreeView(Tree[Text]):
                 
                 panes_to_add = []
                 for pane in window.panes:
+                    if pane.is_self:
+                        continue
+
                     # Apply status filter
                     if status_filter and pane.status not in status_filter:
                         continue
@@ -217,10 +220,21 @@ class TmuxTreeView(Tree[Text]):
             )
 
     def on_tree_node_selected(self, event: Tree.NodeSelected[Text]) -> None:
-        """When a pane leaf node is selected (Enter), emit PaneActivated."""
+        """When a node is selected (Enter), emit PaneActivated for pane/window/session."""
         data = self._node_data.get(event.node.id)
-        if data:
-            node_type, session, window, pane = data
-            if node_type == "pane" and pane is not None:
-                self.post_message(self.PaneActivated(pane_id=pane.pane_id))
+        if not data:
+            return
+        node_type, session, window, pane = data
+        if node_type == "pane" and pane is not None:
+            self.post_message(self.PaneActivated(pane_id=pane.pane_id))
+        elif node_type == "window" and window is not None:
+            active = next((p for p in window.panes if p.is_active), None)
+            if active:
+                self.post_message(self.PaneActivated(pane_id=active.pane_id))
+        elif node_type == "session" and session is not None:
+            active_window = next((w for w in session.windows if w.is_active), None)
+            if active_window:
+                active_pane = next((p for p in active_window.panes if p.is_active), None)
+                if active_pane:
+                    self.post_message(self.PaneActivated(pane_id=active_pane.pane_id))
 

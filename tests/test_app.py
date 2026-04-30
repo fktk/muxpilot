@@ -7,13 +7,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from muxpilot.models import PaneStatus
-from muxpilot.app import MuxpilotApp
+from muxpilot.app import MuxpilotApp, MAX_POLL_BACKOFF_SECONDS
+from muxpilot.watcher import DEFAULT_POLL_INTERVAL
 from muxpilot.widgets.tree_view import TmuxTreeView
 
 from conftest import make_mock_client, make_mock_notify_channel, make_pane, make_session, make_tree, make_window
 
 
-def _patched_app(tree=None, current_pane_id=None, label_store=None):
+def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error=None):
     """Create a MuxpilotApp with a mocked TmuxClient/Watcher."""
     mock_client = make_mock_client(tree=tree, current_pane_id=current_pane_id)
     app = MuxpilotApp()
@@ -21,6 +22,9 @@ def _patched_app(tree=None, current_pane_id=None, label_store=None):
     from muxpilot.watcher import TmuxWatcher
     app._watcher = TmuxWatcher(mock_client)
     app._notify_channel = make_mock_notify_channel()
+    if config_error is not None:
+        app._watcher._config_error = config_error
+        app._notify_config_error()
     if label_store is not None:
         app._label_store = label_store
     return app
@@ -57,6 +61,17 @@ async def test_tree_populated_on_mount():
         assert len(tw._pane_map) > 0
 
 
+@pytest.mark.asyncio
+async def test_shows_warning_when_not_in_tmux():
+    """App should show a warning when launched outside a tmux session."""
+    app = _patched_app()
+    app._client.is_inside_tmux = MagicMock(return_value=False)
+    async with app.run_test() as pilot:
+        await pilot.pause(0.1)
+        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
+        assert any("not running inside a tmux session" in m.lower() for m in messages)
+
+
 # ============================================================================
 # Navigation
 # ============================================================================
@@ -85,6 +100,112 @@ async def test_navigate_to_pane():
     async with app.run_test():
         msg = TmuxTreeView.PaneActivated(pane_id="%0")
         await app.on_tmux_tree_view_pane_activated(msg)
+        app._client.navigate_to.assert_called_once_with("%0")
+
+
+@pytest.mark.asyncio
+async def test_enter_on_window_navigates_to_active_pane():
+    """Selecting a window node (Enter) should emit PaneActivated for its active pane."""
+    from textual.widgets._tree import Tree
+
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", is_active=True),
+            make_pane(pane_id="%1"),
+        ])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%99")
+    async with app.run_test():
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+
+        # Find the window node
+        window_node = None
+        for node_id, (node_type, session, window, pane) in tw._node_data.items():
+            if node_type == "window":
+                window_node = tw.get_node_by_id(node_id)
+                break
+
+        assert window_node is not None
+
+        # Capture posted messages while still delivering them so Textual's
+        # widget lifecycle stays intact.
+        posted = []
+        original_post = tw.post_message
+        def capture_post(msg):
+            posted.append(msg)
+            return original_post(msg)
+        tw.post_message = capture_post
+
+        # Simulate Enter on the window node
+        event = Tree.NodeSelected(window_node)
+        tw.on_tree_node_selected(event)
+
+        # Verify tree emitted PaneActivated for the active pane
+        assert len(posted) == 1
+        assert isinstance(posted[0], TmuxTreeView.PaneActivated)
+        assert posted[0].pane_id == "%0"
+
+
+@pytest.mark.asyncio
+async def test_enter_on_session_navigates_to_active_pane():
+    """Selecting a session node (Enter) should emit PaneActivated for its active window's active pane."""
+    from textual.widgets._tree import Tree
+
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", is_active=True),
+            make_pane(pane_id="%1"),
+        ])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%99")
+    async with app.run_test():
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+
+        # Find the session node
+        session_node = None
+        for node_id, (node_type, session, window, pane) in tw._node_data.items():
+            if node_type == "session":
+                session_node = tw.get_node_by_id(node_id)
+                break
+
+        assert session_node is not None
+
+        # Capture posted messages while still delivering them
+        posted = []
+        original_post = tw.post_message
+        def capture_post(msg):
+            posted.append(msg)
+            return original_post(msg)
+        tw.post_message = capture_post
+
+        # Simulate Enter on the session node
+        event = Tree.NodeSelected(session_node)
+        tw.on_tree_node_selected(event)
+
+        # Verify tree emitted PaneActivated for the active pane
+        assert len(posted) == 1
+        assert isinstance(posted[0], TmuxTreeView.PaneActivated)
+        assert posted[0].pane_id == "%0"
+
+
+@pytest.mark.asyncio
+async def test_back_navigation_returns_to_previous_pane():
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0"),
+            make_pane(pane_id="%1"),
+        ])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%0")
+    async with app.run_test() as pilot:
+        # Jump to %1
+        await app.on_tmux_tree_view_pane_activated(
+            TmuxTreeView.PaneActivated(pane_id="%1")
+        )
+        assert app._previous_pane_id == "%0"
+        # Press b to go back
+        app._client.navigate_to.reset_mock()
+        await pilot.press("b")
         app._client.navigate_to.assert_called_once_with("%0")
 
 
@@ -139,6 +260,18 @@ async def test_filter_input_toggle():
         app.action_filter()
         await pilot.pause()
         assert not fi.has_class("-active")
+
+
+@pytest.mark.asyncio
+async def test_escape_closes_filter_input():
+    """Pressing Escape should close the active filter input."""
+    from textual.widgets import Input
+    app = _patched_app()
+    async with app.run_test() as pilot:
+        await pilot.press("slash")
+        assert app.query_one("#filter-input", Input).has_class("-active")
+        await pilot.press("escape")
+        assert not app.query_one("#filter-input", Input).has_class("-active")
 
 
 # ============================================================================
@@ -416,8 +549,10 @@ async def test_structural_events_still_notified():
 
 
 @pytest.mark.asyncio
-async def test_kill_pane_key_starts_confirm():
-    """Pressing x on a pane node should start kill confirmation."""
+async def test_kill_pane_key_shows_modal():
+    """Pressing x on a pane node should push KillPaneModalScreen."""
+    from muxpilot.screens.kill_modal import KillPaneModalScreen
+
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -433,15 +568,12 @@ async def test_kill_pane_key_starts_confirm():
         app.action_kill_pane()
         await pilot.pause()
 
-        assert app._kill_pane_id == "%0"
-        # Notification should ask for confirmation
-        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
-        assert any("Kill pane %0? (y/n)" in m for m in messages)
+        assert isinstance(app.screen, KillPaneModalScreen)
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_confirm_y_kills():
-    """Pressing y during kill confirmation should call kill_pane."""
+    """Confirming the kill modal with y should call kill_pane."""
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -462,12 +594,11 @@ async def test_kill_pane_confirm_y_kills():
         await pilot.pause()
 
         app._client.kill_pane.assert_called_once_with("%0")
-        assert app._kill_pane_id is None
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_confirm_enter_kills():
-    """Pressing Enter during kill confirmation should also call kill_pane."""
+    """Confirming the kill modal with Enter should also call kill_pane."""
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -488,12 +619,11 @@ async def test_kill_pane_confirm_enter_kills():
         await pilot.pause()
 
         app._client.kill_pane.assert_called_once_with("%0")
-        assert app._kill_pane_id is None
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_cancel_n():
-    """Pressing n during kill confirmation should cancel."""
+    """Pressing n in the kill modal should cancel without killing."""
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -513,12 +643,11 @@ async def test_kill_pane_cancel_n():
         await pilot.pause()
 
         app._client.kill_pane.assert_not_called()
-        assert app._kill_pane_id is None
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_cancel_escape():
-    """Pressing Escape during kill confirmation should cancel."""
+    """Pressing Escape in the kill modal should cancel without killing."""
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
     ])
@@ -538,12 +667,13 @@ async def test_kill_pane_cancel_escape():
         await pilot.pause()
 
         app._client.kill_pane.assert_not_called()
-        assert app._kill_pane_id is None
 
 
 @pytest.mark.asyncio
 async def test_kill_pane_self_not_allowed():
-    """Pressing x on the current (self) pane should not start confirmation."""
+    """Pressing x on the current (self) pane should not push the modal."""
+    from muxpilot.screens.kill_modal import KillPaneModalScreen
+
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%5")])])
     ])
@@ -560,12 +690,22 @@ async def test_kill_pane_self_not_allowed():
         await pilot.pause()
 
         app._client.kill_pane.assert_not_called()
-        assert app._kill_pane_id is None
+        assert not isinstance(app.screen, KillPaneModalScreen)
 
 
 # ============================================================================
 # NotifyChannel lifecycle
 # ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_app_notifies_config_error():
+    """Watcher に config_error があるとき、NotifyChannel にエラーメッセージが送信されること。"""
+    app = _patched_app(config_error="invalid regex")
+    async with app.run_test() as pilot:
+        await pilot.pause(0.1)
+        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
+        assert any("invalid regex" in m for m in messages)
 
 
 @pytest.mark.asyncio
@@ -756,3 +896,106 @@ async def test_rename_escape_cancels(tmp_path):
 
         assert store.get("work.0.0") == ""
         assert not ri.has_class("-active")
+
+
+# ============================================================================
+# Polling: error handling and backoff
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_shows_error_on_exception():
+    """When watcher.poll raises, notify channel should show error and polling continues."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+    async with app.run_test() as pilot:
+        app._notify_channel.send.reset_mock()
+        await app._poll_tmux()
+        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
+        assert any("tmux down" in m for m in messages)
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_pauses_timer_on_exception():
+    """When watcher.poll raises, the repeating poll timer should be paused."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._poll_timer = MagicMock()
+        app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+        with patch.object(app, "set_interval") as mock_set_interval:
+            await app._poll_tmux()
+        app._poll_timer.pause.assert_called_once()
+        mock_set_interval.assert_called_once_with(
+            DEFAULT_POLL_INTERVAL * 2, app._poll_tmux, repeat=False
+        )
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_backoff_doubles_after_failure():
+    """_poll_backoff should double after each failure."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._poll_timer = MagicMock()
+        app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL
+        with patch.object(app, "set_interval"):
+            await app._poll_tmux()
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 2
+        with patch.object(app, "set_interval"):
+            await app._poll_tmux()
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 4
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_backoff_caps_at_max():
+    """_poll_backoff should not exceed MAX_POLL_BACKOFF_SECONDS."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._poll_timer = MagicMock()
+        app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+        # Seed backoff so next doubling would exceed the cap
+        app._poll_backoff = MAX_POLL_BACKOFF_SECONDS - 1.0
+        with patch.object(app, "set_interval") as mock_set_interval:
+            await app._poll_tmux()
+        assert app._poll_backoff == MAX_POLL_BACKOFF_SECONDS
+        mock_set_interval.assert_called_once_with(
+            MAX_POLL_BACKOFF_SECONDS, app._poll_tmux, repeat=False
+        )
+        # Another failure should stay at the cap
+        with patch.object(app, "set_interval") as mock_set_interval:
+            await app._poll_tmux()
+        assert app._poll_backoff == MAX_POLL_BACKOFF_SECONDS
+        mock_set_interval.assert_called_once_with(
+            MAX_POLL_BACKOFF_SECONDS, app._poll_tmux, repeat=False
+        )
+
+
+@pytest.mark.asyncio
+async def test_poll_tmux_resumes_timer_on_recovery():
+    """After a polling failure, success should resume the repeating timer and reset backoff."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._poll_timer = MagicMock()
+        app._watcher.poll = MagicMock(side_effect=[RuntimeError("tmux down"), (tree, [])])
+        with patch.object(app, "set_interval"):
+            await app._poll_tmux()
+        app._poll_timer.pause.assert_called_once()
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 2
+        await app._poll_tmux()
+        app._poll_timer.resume.assert_called_once()
+        assert app._poll_backoff == DEFAULT_POLL_INTERVAL

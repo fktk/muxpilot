@@ -41,6 +41,7 @@ DEFAULT_ERROR_PATTERNS: list[re.Pattern[str]] = [
 
 # Idle threshold in seconds before a pane is considered idle
 DEFAULT_IDLE_THRESHOLD: float = 10.0
+DEFAULT_POLL_INTERVAL: float = 2.0
 
 
 class TmuxWatcher:
@@ -51,36 +52,41 @@ class TmuxWatcher:
         client: TmuxClient,
         idle_threshold: float = DEFAULT_IDLE_THRESHOLD,
         capture_lines: int = 30,
+        config_path: pathlib.Path | None = None,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
     ) -> None:
         self.client = client
         self.idle_threshold = idle_threshold
         self.capture_lines = capture_lines
+        self.poll_interval = poll_interval
         self.activities: dict[str, PaneActivity] = {}
-        
+        self._config_error: str | None = None
+
         # Load default patterns
         self.prompt_patterns = list(DEFAULT_PROMPT_PATTERNS)
         self.error_patterns = list(DEFAULT_ERROR_PATTERNS)
-        
+
         # Override with config if present
-        config_path = pathlib.Path.home() / ".config/muxpilot/config.toml"
+        if config_path is None:
+            config_path = pathlib.Path.home() / ".config/muxpilot/config.toml"
         if config_path.exists():
             try:
                 with open(config_path, "rb") as f:
                     config = tomllib.load(f)
                     watcher_cfg = config.get("watcher", {})
-                    
+
                     custom_prompts = watcher_cfg.get("prompt_patterns", [])
                     if custom_prompts:
                         self.prompt_patterns = [re.compile(p) for p in custom_prompts]
-                        
+
                     custom_errors = watcher_cfg.get("error_patterns", [])
                     if custom_errors:
                         self.error_patterns = [re.compile(p) for p in custom_errors]
-                        
+
                     self.idle_threshold = watcher_cfg.get("idle_threshold", self.idle_threshold)
+                    self.poll_interval = watcher_cfg.get("poll_interval", self.poll_interval)
             except Exception as e:
-                # In a real app we might log this to a file
-                pass
+                self._config_error = str(e)
 
         self._last_tree: TmuxTree | None = None
         self._last_poll_time: float | None = None

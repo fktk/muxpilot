@@ -13,14 +13,17 @@ from textual.widgets import Footer, Header, Static, Input
 from muxpilot.label_store import LabelStore
 from muxpilot.models import TmuxTree, PaneStatus
 from muxpilot.notify_channel import NotifyChannel
+from muxpilot.screens.help_screen import HelpScreen
+from muxpilot.screens.kill_modal import KillPaneModalScreen
 from muxpilot.tmux_client import TmuxClient
 from muxpilot.watcher import TmuxWatcher
 from muxpilot.widgets.detail_panel import DetailPanel
+from muxpilot.widgets.filter_bar import FilterBar
 from muxpilot.widgets.status_bar import StatusBar
 from muxpilot.widgets.tree_view import TmuxTreeView
 
 
-POLL_INTERVAL_SECONDS = 2.0
+MAX_POLL_BACKOFF_SECONDS = 30.0
 NOTIFY_CHECK_INTERVAL = 0.5
 
 
@@ -94,6 +97,7 @@ class MuxpilotApp(App[str | None]):
         Binding("c", "filter_all", "Show all"),
         Binding("n", "rename", "Rename"),
         Binding("x", "kill_pane", "Kill pane"),
+        Binding("b", "back", "Back"),
     ]
 
     def __init__(self) -> None:
@@ -101,13 +105,18 @@ class MuxpilotApp(App[str | None]):
         self._client = TmuxClient()
         self._watcher = TmuxWatcher(self._client)
         self._current_pane_id: str | None = None
+        self._previous_pane_id: str | None = None
         self._navigate_to: str | None = None
         self._status_filter: set[PaneStatus] | None = None
         self._name_filter: str = ""
         self._notify_channel = NotifyChannel()
         self._label_store = LabelStore()
+        self._notify_config_error()
+
         self._rename_key: str | None = None
-        self._kill_pane_id: str | None = None
+        self._poll_backoff = self._watcher.poll_interval
+        self._poll_timer = None
+        self._retry_timer = None
         self.theme = self._label_store.get_theme()
 
     def watch_theme(self, theme: str) -> None:
@@ -115,12 +124,18 @@ class MuxpilotApp(App[str | None]):
         if hasattr(self, "_label_store"):
             self._label_store.set_theme(theme)
 
+    def _notify_config_error(self) -> None:
+        """Send config error from watcher to the notify channel."""
+        if self._watcher._config_error:
+            self._notify_channel.send(f"Config error: {self._watcher._config_error}")
+
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="main-container"):
             with Vertical(id="tree-panel"):
                 yield Input(placeholder="Filter by name...", id="filter-input")
                 yield Input(placeholder="New name (empty to reset)...", id="rename-input")
+                yield FilterBar(id="filter-bar")
                 yield TmuxTreeView(id="tmux-tree")
             yield DetailPanel(id="detail-panel")
         yield StatusBar(id="status-bar")
@@ -130,13 +145,13 @@ class MuxpilotApp(App[str | None]):
         """Initialize the app after mounting."""
         if not self._client.is_inside_tmux():
             # Still allow running for development, but show a warning
-            pass
+            self._notify_channel.send("Warning: not running inside a tmux session")
 
         self._current_pane_id = self._client.get_current_pane_id()
         await self._do_refresh()
 
         # Start the polling timer
-        self.set_interval(POLL_INTERVAL_SECONDS, self._poll_tmux)
+        self._poll_timer = self.set_interval(self._watcher.poll_interval, self._poll_tmux)
 
         # Set initial focus to the tree to avoid the hidden input capturing keys
         self.query_one("#tmux-tree").focus()
@@ -161,6 +176,12 @@ class MuxpilotApp(App[str | None]):
                     if label:
                         pane.custom_label = label
 
+    def _update_current_pane(self, tree: TmuxTree) -> None:
+        """Update _current_pane_id from the tree's active pane."""
+        active_pane = next((p for s in tree.sessions for w in s.windows for p in w.panes if p.is_active), None)
+        if active_pane:
+            self._current_pane_id = active_pane.pane_id
+
     async def _do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
         try:
@@ -170,11 +191,7 @@ class MuxpilotApp(App[str | None]):
             return
 
         self._apply_labels(tree)
-
-        # Update current pane ID from the tree's active pane
-        active_pane = next((p for s in tree.sessions for w in s.windows for p in w.panes if p.is_active), None)
-        if active_pane:
-            self._current_pane_id = active_pane.pane_id
+        self._update_current_pane(tree)
 
         # Update tree view
         tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
@@ -185,6 +202,10 @@ class MuxpilotApp(App[str | None]):
             name_filter=self._name_filter
         )
         
+        # Update filter bar
+        filter_bar = self.query_one("#filter-bar", FilterBar)
+        filter_bar.update(self._status_filter, self._name_filter)
+
         # Update status bar
         status_bar = self.query_one("#status-bar", StatusBar)
         status_bar.update_stats(tree)
@@ -199,10 +220,21 @@ class MuxpilotApp(App[str | None]):
         """Periodic polling callback."""
         try:
             tree, events = await asyncio.to_thread(self._watcher.poll)
-        except Exception:
+        except Exception as e:
+            self._notify_channel.send(f"tmux poll failed: {e}; retrying in {self._poll_backoff}s")
+            self._poll_backoff = min(self._poll_backoff * 2, MAX_POLL_BACKOFF_SECONDS)
+            if self._poll_timer is not None:
+                self._poll_timer.pause()
+            if self._retry_timer is not None:
+                self._retry_timer.stop()
+            self._retry_timer = self.set_interval(self._poll_backoff, self._poll_tmux, repeat=False)
             return
 
+        self._poll_backoff = self._watcher.poll_interval  # reset on success
+        if self._poll_timer is not None:
+            self._poll_timer.resume()
         self._apply_labels(tree)
+        self._update_current_pane(tree)
 
         # Update status bar
         status_bar = self.query_one("#status-bar", StatusBar)
@@ -242,6 +274,7 @@ class MuxpilotApp(App[str | None]):
             self._notify_channel.send("This is the current pane")
             return
 
+        self._previous_pane_id = self._current_pane_id
         success = self._client.navigate_to(pane_id)
         if success:
             self._notify_channel.send(f"Navigated to {pane_id}")
@@ -254,9 +287,21 @@ class MuxpilotApp(App[str | None]):
         await self._do_refresh()
         self._notify_channel.send("Refreshed")
 
+    async def action_back(self) -> None:
+        """Navigate back to the previous pane (b key)."""
+        if self._previous_pane_id:
+            success = self._client.navigate_to(self._previous_pane_id)
+            if success:
+                self._notify_channel.send("Returned to previous pane")
+                await self._do_refresh()
+            else:
+                self._notify_channel.send("Previous pane no longer exists")
+        else:
+            self._notify_channel.send("No previous pane to return to")
+
     def action_help(self) -> None:
         """Show help (? key)."""
-        self._notify_channel.send("j/k: Navigate  Enter: Go to pane  r: Refresh  /: Filter  e: Errors  w: Waiting  c: Clear filters  a: Collapse/Expand all  n: Rename  q: Quit")
+        self.push_screen(HelpScreen())
 
     async def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
@@ -363,7 +408,7 @@ class MuxpilotApp(App[str | None]):
         self.query_one("#tmux-tree").focus()
 
     def action_kill_pane(self) -> None:
-        """Start kill confirmation for the currently selected pane (x key)."""
+        """Show modal to confirm killing the currently selected pane (x key)."""
         tw = self.query_one("#tmux-tree", TmuxTreeView)
         node = tw.cursor_node
         if node is None or node == tw.root:
@@ -382,47 +427,36 @@ class MuxpilotApp(App[str | None]):
             self._notify_channel.send("Cannot kill the current pane")
             return
 
-        self._kill_pane_id = pane.pane_id
-        self._notify_channel.send(f"Kill pane {pane.pane_id}? (y/n)")
+        label = pane.custom_label or pane.pane_id
 
-    async def _confirm_kill_pane(self) -> None:
-        """Execute the pending pane kill."""
-        if self._kill_pane_id is None:
-            return
-        pane_id = self._kill_pane_id
-        self._kill_pane_id = None
+        def on_result(confirmed: bool | None) -> None:
+            if confirmed:
+                success = self._client.kill_pane(pane.pane_id)
+                msg = f"Killed pane {label}" if success else f"Failed to kill pane {label}"
+                self._notify_channel.send(msg)
+                asyncio.create_task(self._do_refresh())
 
-        success = self._client.kill_pane(pane_id)
-        if success:
-            self._notify_channel.send(f"Killed pane {pane_id}")
-            await self._do_refresh()
-        else:
-            self._notify_channel.send(f"Failed to kill pane {pane_id}")
-
-    def _cancel_kill_pane(self) -> None:
-        """Cancel kill pane confirmation."""
-        if self._kill_pane_id is not None:
-            self._kill_pane_id = None
-            self._notify_channel.send("Kill cancelled")
+        self.push_screen(
+            KillPaneModalScreen(pane.pane_id, label),
+            on_result,
+        )
 
     async def on_key(self, event) -> None:
-        """Handle Escape key during rename or kill confirmation."""
-        # Kill confirmation mode
-        if self._kill_pane_id is not None:
-            if event.key in ("y", "enter"):
-                await self._confirm_kill_pane()
-                event.prevent_default()
-                event.stop()
-            elif event.key in ("n", "escape"):
-                self._cancel_kill_pane()
-                event.prevent_default()
-                event.stop()
-            return
-
-        # Rename input escape
+        """Handle Escape key during rename or filter."""
         rename_input = self.query_one("#rename-input", Input)
         if event.key == "escape" and rename_input.has_class("-active"):
             self._cancel_rename()
+            event.prevent_default()
+            event.stop()
+            return
+
+        filter_input = self.query_one("#filter-input", Input)
+        if event.key == "escape" and filter_input.has_class("-active"):
+            filter_input.remove_class("-active")
+            filter_input.value = ""
+            self._name_filter = ""
+            await self._do_refresh()
+            self.query_one("#tmux-tree").focus()
             event.prevent_default()
             event.stop()
 
@@ -442,7 +476,11 @@ class MuxpilotApp(App[str | None]):
                 yield command
 
     async def on_unmount(self) -> None:
-        """Clean up NotifyChannel on app exit."""
+        """Clean up timers and NotifyChannel on app exit."""
+        if self._poll_timer is not None:
+            self._poll_timer.stop()
+        if self._retry_timer is not None:
+            self._retry_timer.stop()
         await self._notify_channel.stop()
 
 

@@ -23,10 +23,10 @@ It is designed specifically for **AI agent orchestration** and managing tasks ru
   | Icon | Status | Detection Condition |
   |:---:|---|---|
   | `●` | ACTIVE | Pane output changed since last poll (command running, log output, etc.) |
-  | `◌` | IDLE | Not a prompt, but output hasn't changed for more than a certain time (default 10 seconds) |
-  | `⏳` | WAITING | Last line matches a prompt pattern and idle time exceeds threshold (waiting for user input) |
-  | `🔴` | ERROR | Error pattern (`Traceback`, `Error:`, `FAILED`, etc.) detected in the last 10 lines |
-  | `✅` | COMPLETED | Last line matches a prompt pattern and idle time is within threshold (right after command completion) |
+  | `○` | IDLE | Not a prompt, but output hasn't changed for more than a certain time (default 10 seconds) |
+  | `◆` | WAITING | Last line matches a prompt pattern and idle time exceeds threshold (waiting for user input) |
+  | `▲` | ERROR | Error pattern (`Traceback`, `Error:`, `FAILED`, etc.) detected in the last 10 lines |
+  | `■` | COMPLETED | Last line matches a prompt pattern and idle time is within threshold (right after command completion) |
 
   Status is determined in priority order: **ERROR → COMPLETED / WAITING → IDLE → ACTIVE**.
 
@@ -68,6 +68,15 @@ idle_threshold = 10.0
 - `error_patterns`: Regex list for detecting errors. **Replaces** the default patterns entirely.
 - `idle_threshold`: Seconds before a pane is considered idle.
 
+### Theme
+
+You can set the UI theme under the `[app]` section:
+
+```toml
+[app]
+theme = "textual-dark"  # or "textual-light", "nord", "gruvbox"
+```
+
 See `config.example.toml` for more details.
 
 ## ⌨️ Keybindings
@@ -80,8 +89,8 @@ See `config.example.toml` for more details.
 | `a` | Collapse / expand all nodes (toggle) |
 | `r` | Manual refresh |
 | `/` | Toggle filter input on/off |
-| `e` | Show only error (🔴) panes |
-| `w` | Show only waiting (⏳) panes |
+| `e` | Show only error (▲) panes |
+| `w` | Show only waiting (◆) panes |
 | `c` | Clear filters and show all |
 | `n` | Rename the selected node (custom label) |
 | `?` | Show help |
@@ -102,10 +111,10 @@ muxpilot displays toast notifications in the lower right corner of the screen. T
 
 ### External Notifications
 
-muxpilot monitors a FIFO (named pipe) at `~/.muxpilot/notify` and can receive arbitrary messages from external processes.
+muxpilot monitors a FIFO (named pipe) at `~/.config/muxpilot/notify` and can receive arbitrary messages from external processes.
 
 ```bash
-echo "Build complete!" > ~/.muxpilot/notify
+echo "Build complete!" > ~/.config/muxpilot/notify
 ```
 
 This allows you to display notifications on muxpilot from shell scripts or CI tools.
