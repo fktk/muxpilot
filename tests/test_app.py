@@ -24,6 +24,8 @@ def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error
     mock_client = make_mock_client(tree=tree, current_pane_id=current_pane_id)
     app = MuxpilotApp()
     app._client = mock_client
+    from muxpilot.controllers import RenameController
+    app._rename_controller = RenameController(mock_client)
     from muxpilot.watcher import TmuxWatcher
     app._watcher = TmuxWatcher(mock_client, config_path=pathlib.Path("/nonexistent-muxpilot-config"))
     app._notify_channel = make_mock_notify_channel()
@@ -666,28 +668,6 @@ async def test_notify_channel_started_on_mount():
 # ============================================================================
 
 
-@pytest.mark.asyncio
-async def test_labels_applied_on_refresh():
-    """In-memory overlay labels should appear in the tree after refresh."""
-    tree = make_tree(sessions=[
-        make_session(session_name="work", session_id="$0", windows=[
-            make_window(window_name="editor", window_index=0, panes=[
-                make_pane(pane_id="%0", pane_index=0),
-            ])
-        ])
-    ])
-    app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
-        app._rename_controller.set("work", "🚀 Main Project")
-        await app._do_refresh()
-        await pilot.pause()
-
-        tw = app.query_one("#tmux-tree", TmuxTreeView)
-        for node_id, (node_type, session, window, pane) in tw._node_data.items():
-            if node_type == "session" and session:
-                assert session.custom_label == "🚀 Main Project"
-
-
 # ============================================================================
 # Custom labels: rename action (n key)
 # ============================================================================
@@ -722,8 +702,8 @@ async def test_rename_key_shows_input(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_rename_submit_sets_overlay():
-    """Submitting a name in rename input should set an in-memory overlay."""
+async def test_rename_submit_sets_pane_title():
+    """Submitting a name in rename input should call set_pane_title on the client."""
     from textual.widgets import Input
 
     tree = make_tree(sessions=[
@@ -750,12 +730,12 @@ async def test_rename_submit_sets_overlay():
         await pilot.press("enter")
         await pilot.pause()
 
-        assert app._rename_controller.get("work.0.0") == "my test runner"
+        app._client.set_pane_title.assert_called_with("%0", "my test runner")
 
 
 @pytest.mark.asyncio
-async def test_rename_empty_deletes_overlay():
-    """Submitting empty string should delete the in-memory overlay."""
+async def test_rename_empty_sets_empty_pane_title():
+    """Submitting empty string should call set_pane_title with empty string."""
     from textual.widgets import Input
 
     tree = make_tree(sessions=[
@@ -766,7 +746,6 @@ async def test_rename_empty_deletes_overlay():
         ])
     ])
     app = _patched_app(tree=tree)
-    app._rename_controller.set("work.0.0", "old label")
     async with app.run_test() as pilot:
         tw = app.query_one("#tmux-tree", TmuxTreeView)
         tw.focus()
@@ -783,12 +762,12 @@ async def test_rename_empty_deletes_overlay():
         await pilot.press("enter")
         await pilot.pause()
 
-        assert app._rename_controller.get("work.0.0") == ""
+        app._client.set_pane_title.assert_called_with("%0", "")
 
 
 @pytest.mark.asyncio
 async def test_rename_escape_cancels():
-    """Pressing Escape during rename should cancel without saving."""
+    """Pressing Escape during rename should cancel without calling set_pane_title."""
     from textual.widgets import Input
 
     tree = make_tree(sessions=[
@@ -815,7 +794,7 @@ async def test_rename_escape_cancels():
         await pilot.press("escape")
         await pilot.pause()
 
-        assert app._rename_controller.get("work.0.0") == ""
+        app._client.set_pane_title.assert_not_called()
         assert not ri.has_class("-active")
 
 
