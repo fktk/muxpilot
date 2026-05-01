@@ -120,10 +120,14 @@ class FilterState:
 
 
 class RenameController:
-    """Manages the in-progress rename operation for a tree node."""
+    """Manages the in-progress rename operation for a tree node.
 
-    def __init__(self, label_store) -> None:
-        self._label_store = label_store
+    Labels are kept only in memory (overlays).  They are never persisted to
+    disk — when the muxpilot process exits the overlays are lost.
+    """
+
+    def __init__(self) -> None:
+        self._overlays: dict[str, str] = {}
         self._key: str | None = None
 
     @property
@@ -134,11 +138,26 @@ class RenameController:
     def key(self, value: str | None) -> None:
         self._key = value
 
+    def get(self, key: str) -> str:
+        """Return the in-memory overlay label for *key*, or empty string."""
+        return self._overlays.get(key, "")
+
+    def set(self, key: str, value: str) -> None:
+        """Set (or delete if empty) an in-memory overlay label."""
+        if not value:
+            self.delete(key)
+            return
+        self._overlays[key] = value
+
+    def delete(self, key: str) -> None:
+        """Remove an in-memory overlay label."""
+        self._overlays.pop(key, None)
+
     def start(self, node_data: tuple[str, ...] | None) -> str | None:
         """Begin a rename for the given node data.
 
-        Returns the current custom label (or empty string) if a rename can start,
-        or None if the node data does not support renaming.
+        Returns the current overlay label (or empty string) if a rename can
+        start, or None if the node data does not support renaming.
         """
         if node_data is None:
             return None
@@ -151,20 +170,34 @@ class RenameController:
             self._key = f"{session.session_name}.{window.window_index}.{pane.pane_index}"
         else:
             return None
-        return self._label_store.get(self._key)
+        return self.get(self._key)
 
     def finish(self, value: str) -> str | None:
         """Commit the rename and return the affected key, or None."""
         key = self._key
         if key is None:
             return None
-        if value:
-            self._label_store.set(key, value)
-        else:
-            self._label_store.delete(key)
+        self.set(key, value)
         self._key = None
         return key
 
     def cancel(self) -> None:
         """Abort the rename without saving."""
         self._key = None
+
+    def apply(self, tree: TmuxTree) -> None:
+        """Apply in-memory overlay labels to a tree snapshot."""
+        for session in tree.sessions:
+            label = self._overlays.get(session.session_name)
+            if label is not None:
+                session.custom_label = label
+            for window in session.windows:
+                key = f"{session.session_name}.{window.window_index}"
+                label = self._overlays.get(key)
+                if label is not None:
+                    window.custom_label = label
+                for pane in window.panes:
+                    key = f"{session.session_name}.{window.window_index}.{pane.pane_index}"
+                    label = self._overlays.get(key)
+                    if label is not None:
+                        pane.custom_label = label

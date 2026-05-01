@@ -748,10 +748,9 @@ async def test_rename_key_shows_input(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_rename_submit_saves_label(tmp_path):
-    """Submitting a name in rename input should save it via LabelStore."""
+async def test_rename_submit_sets_overlay():
+    """Submitting a name in rename input should set an in-memory overlay."""
     from textual.widgets import Input
-    from muxpilot.label_store import LabelStore
 
     tree = make_tree(sessions=[
         make_session(session_name="work", session_id="$0", windows=[
@@ -760,8 +759,7 @@ async def test_rename_submit_saves_label(tmp_path):
             ])
         ])
     ])
-    store = LabelStore(config_path=tmp_path / "config.toml")
-    app = _patched_app(tree=tree, label_store=store)
+    app = _patched_app(tree=tree)
     async with app.run_test() as pilot:
         tw = app.query_one("#tmux-tree", TmuxTreeView)
         tw.focus()
@@ -778,14 +776,13 @@ async def test_rename_submit_saves_label(tmp_path):
         await pilot.press("enter")
         await pilot.pause()
 
-        assert store.get("work.0.0") == "my test runner"
+        assert app._rename_controller.get("work.0.0") == "my test runner"
 
 
 @pytest.mark.asyncio
-async def test_rename_empty_deletes_label(tmp_path):
-    """Submitting empty string should delete the custom label."""
+async def test_rename_empty_deletes_overlay():
+    """Submitting empty string should delete the in-memory overlay."""
     from textual.widgets import Input
-    from muxpilot.label_store import LabelStore
 
     tree = make_tree(sessions=[
         make_session(session_name="work", session_id="$0", windows=[
@@ -794,9 +791,8 @@ async def test_rename_empty_deletes_label(tmp_path):
             ])
         ])
     ])
-    store = LabelStore(config_path=tmp_path / "config.toml")
-    store.set("work.0.0", "old label")
-    app = _patched_app(tree=tree, label_store=store)
+    app = _patched_app(tree=tree)
+    app._rename_controller.set("work.0.0", "old label")
     async with app.run_test() as pilot:
         tw = app.query_one("#tmux-tree", TmuxTreeView)
         tw.focus()
@@ -813,14 +809,13 @@ async def test_rename_empty_deletes_label(tmp_path):
         await pilot.press("enter")
         await pilot.pause()
 
-        assert store.get("work.0.0") == ""
+        assert app._rename_controller.get("work.0.0") == ""
 
 
 @pytest.mark.asyncio
-async def test_rename_escape_cancels(tmp_path):
+async def test_rename_escape_cancels():
     """Pressing Escape during rename should cancel without saving."""
     from textual.widgets import Input
-    from muxpilot.label_store import LabelStore
 
     tree = make_tree(sessions=[
         make_session(session_name="work", session_id="$0", windows=[
@@ -829,8 +824,7 @@ async def test_rename_escape_cancels(tmp_path):
             ])
         ])
     ])
-    store = LabelStore(config_path=tmp_path / "config.toml")
-    app = _patched_app(tree=tree, label_store=store)
+    app = _patched_app(tree=tree)
     async with app.run_test() as pilot:
         tw = app.query_one("#tmux-tree", TmuxTreeView)
         tw.focus()
@@ -847,7 +841,7 @@ async def test_rename_escape_cancels(tmp_path):
         await pilot.press("escape")
         await pilot.pause()
 
-        assert store.get("work.0.0") == ""
+        assert app._rename_controller.get("work.0.0") == ""
         assert not ri.has_class("-active")
 
 

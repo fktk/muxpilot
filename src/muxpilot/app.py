@@ -113,7 +113,7 @@ class MuxpilotApp(App[str | None]):
         self._notify_config_error()
 
         self._filter_state = FilterState()
-        self._rename_controller = RenameController(self._label_store_instance)
+        self._rename_controller = RenameController()
         self._polling = PollingController(
             self, self._watcher_instance, self._notify_channel_instance
         )
@@ -151,8 +151,6 @@ class MuxpilotApp(App[str | None]):
     @_label_store.setter
     def _label_store(self, value) -> None:
         self._label_store_instance = value
-        if hasattr(self, "_rename_controller"):
-            self._rename_controller = RenameController(value)
 
     # --- backward-compatible property delegates for tests ---
     @property
@@ -245,7 +243,7 @@ class MuxpilotApp(App[str | None]):
         self.set_interval(NOTIFY_CHECK_INTERVAL, self._check_notifications)
 
     def _apply_labels(self, tree: TmuxTree) -> None:
-        """Apply custom labels from LabelStore to the tree snapshot."""
+        """Apply custom labels from LabelStore and in-memory overlays to the tree."""
         for session in tree.sessions:
             label = self._label_store.get(session.session_name)
             if label:
@@ -260,6 +258,8 @@ class MuxpilotApp(App[str | None]):
                     label = self._label_store.get(key)
                     if label:
                         pane.custom_label = label
+        # In-memory overlays take precedence and are never persisted.
+        self._rename_controller.apply(tree)
 
     async def _do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
