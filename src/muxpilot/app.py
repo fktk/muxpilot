@@ -110,7 +110,7 @@ class MuxpilotApp(App[str | None]):
         self._notify_config_error()
 
         self._filter_state = FilterState()
-        self._rename_controller = RenameController()
+        self._rename_controller = RenameController(self._client)
         self._polling = PollingController(
             self, self._watcher_instance, self._notify_channel_instance
         )
