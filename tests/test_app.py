@@ -67,6 +67,36 @@ async def test_tree_populated_on_mount():
 
 
 @pytest.mark.asyncio
+async def test_detail_panel_shows_pane_title_and_git():
+    """Detail panel should display pane title, repo, branch, and idle time."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="dev", windows=[
+        make_window(window_name="editor", panes=[
+            make_pane(
+                pane_id="%0",
+                pane_title="agent-a",
+                repo_name="proj",
+                branch="feat/x",
+                idle_seconds=12.0,
+                status=PaneStatus.IDLE,
+                recent_lines=["line1", "line2"],
+            )
+        ])
+    ])
+    window = session.windows[0]
+    pane = window.panes[0]
+    panel.show_pane(pane, window, session)
+    text = str(panel._content.render())
+    assert "agent-a" in text
+    assert "proj" in text
+    assert "feat/x" in text
+    assert "12.0s idle" in text
+    assert "line1" in text
+    assert "line2" in text
+
+
+@pytest.mark.asyncio
 async def test_shows_warning_when_not_in_tmux():
     """App should show a warning when launched outside a tmux session."""
     app = _patched_app()
