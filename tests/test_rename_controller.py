@@ -168,18 +168,3 @@ class TestRenameControllerOverlay:
 
         ctrl2 = RenameController()
         assert ctrl2.get("work") == ""
-
-    def test_overlay_overrides_store(self) -> None:
-        """When LabelStore and overlay both have a value, overlay wins."""
-        from pathlib import Path
-        from muxpilot.label_store import LabelStore
-        tmp_path = Path("/tmp/muxpilot_test_ctrl")
-        tmp_path.mkdir(parents=True, exist_ok=True)
-        config = tmp_path / "config.toml"
-        store = LabelStore(config_path=config)
-        store.set("work", "Stored Label")
-
-        ctrl = RenameController()
-        # Simulate applying both sources: store first, then overlay
-        ctrl.set("work", "Overlay Label")
-        assert ctrl.get("work") == "Overlay Label"

@@ -1,4 +1,4 @@
-"""TOML-backed label persistence for custom display names."""
+"""TOML-backed theme persistence for muxpilot."""
 
 from __future__ import annotations
 
@@ -12,43 +12,15 @@ DEFAULT_CONFIG_PATH = Path.home() / ".config" / "muxpilot" / "config.toml"
 
 
 class LabelStore:
-    """Reads and writes custom labels to a TOML config file.
+    """Reads and writes app settings (theme) to a TOML config file.
 
-    Labels are stored under the [labels] section with flat string keys:
-      - "session_name" for sessions
-      - "session_name.window_index" for windows
-      - "session_name.window_index.pane_index" for panes
+    Custom labels are no longer persisted — they are handled in-memory
+    by RenameController.
     """
 
     def __init__(self, config_path: Path | None = None) -> None:
         self._path = config_path or DEFAULT_CONFIG_PATH
         self._doc: TOMLDocument = self._load()
-
-    def get(self, key: str) -> str:
-        """Return the custom label for *key*, or empty string if unset."""
-        labels = self._doc.get("labels")
-        if labels is None:
-            return ""
-        return labels.get(key, "")  # type: ignore[no-any-return]
-
-    def set(self, key: str, label: str) -> None:
-        """Set (or delete if empty) a custom label and persist to disk."""
-        if not label:
-            self.delete(key)
-            return
-        if "labels" not in self._doc:
-            self._doc.add("labels", tomlkit.table())
-        self._doc["labels"][key] = label  # type: ignore[index]
-        self._save()
-
-    def delete(self, key: str) -> None:
-        """Remove a custom label. No-op if key doesn't exist."""
-        labels = self._doc.get("labels")
-        if labels is None:
-            return
-        if key in labels:
-            del labels[key]
-            self._save()
 
     def get_theme(self) -> str:
         """Return the stored theme or 'textual-dark' default."""

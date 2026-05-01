@@ -243,22 +243,7 @@ class MuxpilotApp(App[str | None]):
         self.set_interval(NOTIFY_CHECK_INTERVAL, self._check_notifications)
 
     def _apply_labels(self, tree: TmuxTree) -> None:
-        """Apply custom labels from LabelStore and in-memory overlays to the tree."""
-        for session in tree.sessions:
-            label = self._label_store.get(session.session_name)
-            if label:
-                session.custom_label = label
-            for window in session.windows:
-                key = f"{session.session_name}.{window.window_index}"
-                label = self._label_store.get(key)
-                if label:
-                    window.custom_label = label
-                for pane in window.panes:
-                    key = f"{session.session_name}.{window.window_index}.{pane.pane_index}"
-                    label = self._label_store.get(key)
-                    if label:
-                        pane.custom_label = label
-        # In-memory overlays take precedence and are never persisted.
+        """Apply in-memory overlay labels to the tree snapshot."""
         self._rename_controller.apply(tree)
 
     async def _do_refresh(self) -> None:

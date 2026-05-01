@@ -690,11 +690,8 @@ async def test_events_sent_through_notify_channel():
 
 
 @pytest.mark.asyncio
-async def test_labels_applied_on_refresh(tmp_path):
-    """Custom labels from LabelStore should appear in the tree after refresh."""
-    from muxpilot.label_store import LabelStore
-    store = LabelStore(config_path=tmp_path / "config.toml")
-
+async def test_labels_applied_on_refresh():
+    """In-memory overlay labels should appear in the tree after refresh."""
     tree = make_tree(sessions=[
         make_session(session_name="work", session_id="$0", windows=[
             make_window(window_name="editor", window_index=0, panes=[
@@ -702,9 +699,9 @@ async def test_labels_applied_on_refresh(tmp_path):
             ])
         ])
     ])
-    app = _patched_app(tree=tree, label_store=store)
+    app = _patched_app(tree=tree)
     async with app.run_test() as pilot:
-        app._label_store.set("work", "🚀 Main Project")
+        app._rename_controller.set("work", "🚀 Main Project")
         await app.action_refresh()
         await pilot.pause()
 
