@@ -187,7 +187,7 @@ class TmuxClient:
     def _find_pane(self, pane_id: str) -> libtmux.Pane | None:
         """Find a pane object by its ID across all sessions.
 
-        Uses a cache populated by get_tree() to avoid redundant tmux commands.
+        Uses a cache populated by previous calls to avoid redundant tmux commands.
         Falls back to a full server scan if the cache miss.
         """
         if pane_id in self._pane_cache:
