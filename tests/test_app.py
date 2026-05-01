@@ -89,7 +89,7 @@ async def test_detail_panel_shows_pane_title_and_git():
     window = session.windows[0]
     pane = window.panes[0]
     panel.show_pane(pane, window, session)
-    text = str(panel._content.render())
+    text = panel._markdown_source
     assert "agent-a" in text
     assert "proj" in text
     assert "feat/x" in text
