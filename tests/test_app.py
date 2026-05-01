@@ -234,18 +234,6 @@ async def test_q_in_help_screen_does_not_quit():
         assert app.is_running
 
 
-@pytest.mark.asyncio
-async def test_refresh_key():
-    """Pressing r should trigger an additional get_tree call."""
-    app = _patched_app()
-    async with app.run_test() as pilot:
-        # Focus the tree so 'r' is handled by the app-level binding
-        app.query_one("#tmux-tree").focus()
-        initial_calls = app._client.get_tree.call_count
-        await pilot.press("r")
-        assert app._client.get_tree.call_count > initial_calls
-
-
 # ============================================================================
 # Filter: name filter (/ toggle)
 # ============================================================================
@@ -639,21 +627,6 @@ async def test_notify_channel_started_on_mount():
         app._notify_channel.start.assert_called_once()
 
 
-@pytest.mark.asyncio
-async def test_events_sent_through_notify_channel():
-    """リフレッシュ時に NotifyChannel.send() 経由で通知されること。"""
-    tree = make_tree()
-    app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
-        app.query_one("#tmux-tree").focus()
-        await pilot.press("r")
-        assert any(
-            call.args[0] == "Refreshed"
-            for call in app._notify_channel.send.call_args_list
-            if call.args
-        )
-
-
 # ============================================================================
 # Custom labels: applied on refresh
 # ============================================================================
@@ -672,7 +645,7 @@ async def test_labels_applied_on_refresh():
     app = _patched_app(tree=tree)
     async with app.run_test() as pilot:
         app._rename_controller.set("work", "🚀 Main Project")
-        await app.action_refresh()
+        await app._do_refresh()
         await pilot.pause()
 
         tw = app.query_one("#tmux-tree", TmuxTreeView)

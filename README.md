@@ -81,7 +81,6 @@ See `config.example.toml` for more details.
 | `↓` / `j` | Move cursor down |
 | `Enter` | Jump to selected pane (muxpilot continues running in the background) |
 | `a` | Collapse / expand all nodes (toggle) |
-| `r` | Manual refresh |
 | `/` | Toggle filter input on/off |
 | `c` | Clear filters and show all |
 | `n` | Rename the selected node (custom label) |

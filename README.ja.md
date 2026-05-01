@@ -72,7 +72,6 @@ error_patterns = ['(?i)Error|Exception|Traceback|FAILED|panic|Segmentation fault
 | `↓` / `j` | カーソルを下に移動 |
 | `Enter` | 選択したペインにジャンプ（muxpilot は裏で起動し続けます） |
 | `a` | すべてのノードを折り畳み / 展開（トグル） |
-| `r` | 情報の手動リフレッシュ |
 | `/` | フィルタ入力のオン/オフ |
 | `c` | フィルタを解除して全表示 |
 | `n` | 選択中のノードの名前を変更（カスタムラベル） |

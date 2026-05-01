@@ -92,7 +92,6 @@ class MuxpilotApp(App[str | None]):
 
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
-        Binding("r", "refresh", "Refresh"),
         Binding("question_mark", "help", "Help", show=False),
         Binding("slash", "filter", "Filter"),
         Binding("c", "filter_all", "Show all"),
@@ -321,11 +320,6 @@ class MuxpilotApp(App[str | None]):
             await self._do_refresh()
         else:
             self._notify_channel.send(f"Failed to navigate to {pane_id}")
-
-    async def action_refresh(self) -> None:
-        """Manual refresh (r key)."""
-        await self._do_refresh()
-        self._notify_channel.send("Refreshed")
 
     def action_help(self) -> None:
         """Show help (? key)."""
