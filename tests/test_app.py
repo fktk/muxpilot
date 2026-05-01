@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from muxpilot.models import PaneStatus
+import pathlib
+
 from muxpilot.app import MuxpilotApp, MAX_POLL_BACKOFF_SECONDS, main
 from muxpilot.screens.help_screen import HelpScreen
 from muxpilot.watcher import DEFAULT_POLL_INTERVAL
@@ -23,7 +25,7 @@ def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error
     app = MuxpilotApp()
     app._client = mock_client
     from muxpilot.watcher import TmuxWatcher
-    app._watcher = TmuxWatcher(mock_client)
+    app._watcher = TmuxWatcher(mock_client, config_path=pathlib.Path("/nonexistent-muxpilot-config"))
     app._notify_channel = make_mock_notify_channel()
     if config_error is not None:
         app._watcher._config_error = config_error
@@ -973,3 +975,86 @@ def test_main_outside_tmux_attaches_even_if_session_exists(mock_client_cls, mock
     mock_execlp.assert_called_once_with(
         "tmux", "tmux", "attach", "-t", "muxpilot"
     )
+
+
+# ============================================================================
+# Polling cooldown
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_poll_cooldown_skips_tick():
+    """When cooldown is active, tick() should return None without polling."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test():
+        app._polling.trigger_cooldown(60.0)
+        result = await app._polling.tick()
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test_poll_retry_limit_stops_polling():
+    """After max_consecutive_failures, polling should stop and notify."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+        app._poll_timer = MagicMock()
+        app._polling.max_consecutive_failures = 3
+
+        for _ in range(3):
+            with patch.object(app, "set_interval"):
+                await app._poll_tmux()
+
+        app._poll_timer.stop.assert_called_once()
+        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
+        assert any("stopped after 3 consecutive failures" in m for m in messages)
+
+
+# ============================================================================
+# Cooldown triggered by user actions
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_navigate_triggers_cooldown():
+    """Navigating to a pane should trigger polling cooldown."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%99")
+    async with app.run_test():
+        app._polling.trigger_cooldown = MagicMock()
+        msg = TmuxTreeView.PaneActivated(pane_id="%0")
+        await app.on_tmux_tree_view_pane_activated(msg)
+        app._polling.trigger_cooldown.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_kill_triggers_cooldown():
+    """Killing a pane should trigger polling cooldown."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
+    ])
+    app = _patched_app(tree=tree, current_pane_id="%99")
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        app.action_kill_pane()
+        await pilot.pause()
+
+        app._polling.trigger_cooldown = MagicMock()
+        await pilot.press("y")
+        await pilot.pause()
+
+        app._polling.trigger_cooldown.assert_called_once()

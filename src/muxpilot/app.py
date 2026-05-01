@@ -317,6 +317,7 @@ class MuxpilotApp(App[str | None]):
         success = self._client.navigate_to(pane_id)
         if success:
             self._notify_channel.send(f"Navigated to {pane_id}")
+            self._polling.trigger_cooldown()
             await self._do_refresh()
         else:
             self._notify_channel.send(f"Failed to navigate to {pane_id}")
@@ -417,6 +418,7 @@ class MuxpilotApp(App[str | None]):
                 success = self._client.kill_pane(pane.pane_id)
                 msg = f"Killed pane {label}" if success else f"Failed to kill pane {label}"
                 self._notify_channel.send(msg)
+                self._polling.trigger_cooldown()
                 asyncio.create_task(self._do_refresh())
 
         self.push_screen(
