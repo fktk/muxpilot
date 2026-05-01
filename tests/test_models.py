@@ -25,12 +25,13 @@ from conftest import make_pane, make_session, make_tree, make_window
 # ============================================================================
 
 
-def test_status_icons_are_unified_geometric_symbols():
-    """STATUS_ICONS should use consistent geometric symbols, not mixed emoji."""
+def test_status_icons_use_bold_letters():
+    """STATUS_ICONS should use bold letters for clarity."""
     expected = {
-        PaneStatus.ACTIVE: "●",
-        PaneStatus.WAITING_INPUT: "◆",
-        PaneStatus.ERROR: "▲",
+        PaneStatus.ACTIVE: "[bold]A[/bold]",
+        PaneStatus.WAITING_INPUT: "[bold]W[/bold]",
+        PaneStatus.ERROR: "[bold]E[/bold]",
+        PaneStatus.IDLE: "[bold]I[/bold]",
     }
     assert STATUS_ICONS == expected
 
@@ -134,7 +135,7 @@ class TestPaneInfoDisplayLabel:
         assert "zsh" in label
         assert "/home/user" not in label
         assert "muxpilot/src" in label or "src" in label
-        assert "[" not in label
+        assert "[]" not in label
         assert " — " in label
 
 

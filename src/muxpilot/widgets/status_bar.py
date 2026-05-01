@@ -25,6 +25,7 @@ class StatusBar(Static):
         PaneStatus.ACTIVE: "active",
         PaneStatus.WAITING_INPUT: "waiting",
         PaneStatus.ERROR: "error",
+        PaneStatus.IDLE: "idle",
     }
 
     def __init__(self, name: str | None = None, id: str | None = None) -> None:
@@ -53,7 +54,7 @@ class StatusBar(Static):
         ]
 
         # Add status breakdown if any panes have known status
-        for status in [PaneStatus.ACTIVE, PaneStatus.WAITING_INPUT, PaneStatus.ERROR]:
+        for status in [PaneStatus.ACTIVE, PaneStatus.WAITING_INPUT, PaneStatus.ERROR, PaneStatus.IDLE]:
             count = status_counts.get(status, 0)
             if count > 0:
                 icon = STATUS_ICONS[status]

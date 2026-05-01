@@ -26,15 +26,19 @@ def _make_watcher(
 class TestDetermineStatus:
     """Tests for _determine_status — the core pattern detection logic."""
 
-    def _status(self, content, last_line="", idle=0.0, threshold=10.0):
+    def _status(self, content, last_line="", idle=0.0, threshold=10.0, old_status=None, content_changed=True):
         w = _make_watcher(idle_threshold=threshold)
-        return w._determine_status(content, last_line, idle)
+        old_status = old_status if old_status is not None else PaneStatus.ACTIVE
+        return w._determine_status(content, last_line, idle, old_status, content_changed)
 
     def test_active_when_content_changing(self):
         assert self._status(["output"], "output", idle=0.0) == PaneStatus.ACTIVE
 
     def test_idle_when_no_change(self):
-        assert self._status(["output"], "output", idle=15.0) == PaneStatus.ACTIVE
+        assert self._status(["output"], "output", idle=15.0, old_status=PaneStatus.ACTIVE, content_changed=False) == PaneStatus.IDLE
+
+    def test_idle_threshold_not_met_stays_active(self):
+        assert self._status(["output"], "output", idle=5.0, old_status=PaneStatus.ACTIVE, content_changed=False) == PaneStatus.ACTIVE
 
     def test_completed_shell_prompt(self):
         assert self._status(["user@host:~$ "], "user@host:~$ ", idle=0.0) == PaneStatus.WAITING_INPUT
@@ -79,6 +83,22 @@ class TestDetermineStatus:
         """When both error and prompt are present, ERROR should win."""
         lines = ["Error: something failed", "user@host:~$ "]
         assert self._status(lines, "user@host:~$ ", idle=15.0) == PaneStatus.ERROR
+
+    def test_error_persists_when_no_change(self):
+        """ERROR status should persist until content changes."""
+        assert self._status(["Error: old"], "Error: old", idle=60.0, old_status=PaneStatus.ERROR, content_changed=False) == PaneStatus.ERROR
+
+    def test_waiting_persists_when_no_change(self):
+        """WAITING_INPUT status should persist until content changes."""
+        assert self._status(["$ "], "$ ", idle=60.0, old_status=PaneStatus.WAITING_INPUT, content_changed=False) == PaneStatus.WAITING_INPUT
+
+    def test_error_resets_on_change_without_pattern(self):
+        """ERROR should reset to ACTIVE when content changes and no error pattern matches."""
+        assert self._status(["normal output"], "normal output", idle=0.0, old_status=PaneStatus.ERROR, content_changed=True) == PaneStatus.ACTIVE
+
+    def test_waiting_resets_on_change_without_pattern(self):
+        """WAITING_INPUT should reset to ACTIVE when content changes and no prompt matches."""
+        assert self._status(["normal output"], "normal output", idle=0.0, old_status=PaneStatus.WAITING_INPUT, content_changed=True) == PaneStatus.ACTIVE
 
     def test_empty_content(self):
         assert self._status([], "", idle=0.0) == PaneStatus.ACTIVE
@@ -145,6 +165,7 @@ class TestAnalyzePane:
         assert activity.pane_id == "%0"
         assert activity.idle_seconds == 0.0
         assert activity.last_content_hash != ""
+        assert activity.content_changed is True
 
     def test_content_unchanged_increments_idle(self):
         w = _make_watcher()
@@ -153,6 +174,7 @@ class TestAnalyzePane:
         w._last_tree = make_tree(timestamp=100.0)
         second = w._analyze_pane("%0", ["hello"], first, 2.0)
         assert second.idle_seconds == 2.0
+        assert second.content_changed is False
 
     def test_content_changed_resets_idle(self):
         w = _make_watcher()
@@ -162,6 +184,7 @@ class TestAnalyzePane:
         w._last_tree = make_tree(timestamp=100.0)
         second = w._analyze_pane("%0", ["world"], first, 2.0)
         assert second.idle_seconds == 0.0
+        assert second.content_changed is True
 
 
 class TestPoll:
