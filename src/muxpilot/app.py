@@ -95,8 +95,6 @@ class MuxpilotApp(App[str | None]):
         Binding("r", "refresh", "Refresh"),
         Binding("question_mark", "help", "Help", show=False),
         Binding("slash", "filter", "Filter"),
-        Binding("e", "filter_errors", "Errors only"),
-        Binding("w", "filter_waiting", "Waiting only"),
         Binding("c", "filter_all", "Show all"),
         Binding("n", "rename", "Rename"),
         Binding("x", "kill_pane", "Kill pane"),
@@ -362,18 +360,6 @@ class MuxpilotApp(App[str | None]):
         else:
             filter_input.add_class("-active")
             filter_input.focus()
-
-    async def action_filter_errors(self) -> None:
-        """Filter to show only error panes (e key)."""
-        msg = self._filter_state.toggle_error()
-        self._notify_channel.send(msg)
-        await self._do_refresh()
-
-    async def action_filter_waiting(self) -> None:
-        """Filter to show only waiting panes (w key)."""
-        msg = self._filter_state.toggle_waiting()
-        self._notify_channel.send(msg)
-        await self._do_refresh()
 
     async def action_filter_all(self) -> None:
         """Clear all filters (a key)."""

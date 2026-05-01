@@ -15,8 +15,6 @@ It is designed specifically for **AI agent orchestration** and managing tasks ru
 - **⌨️ Keyboard Navigation**: Vim-like keybindings (`j`/`k`) for quickly moving between panes.
 - **🔍 Filtering**:
   - `/`: Filter by name (session name, command, path, etc.)
-  - `w`: Extract only panes waiting for input (prompt displayed)
-  - `e`: Extract only panes with errors
   - `c`: Clear filters and show all
 - **👀 Status Monitoring**: Periodically polls each pane's output and automatically assigns one of three status icons:
 
@@ -85,8 +83,6 @@ See `config.example.toml` for more details.
 | `a` | Collapse / expand all nodes (toggle) |
 | `r` | Manual refresh |
 | `/` | Toggle filter input on/off |
-| `e` | Show only error (▲) panes |
-| `w` | Show only waiting (◆) panes |
 | `c` | Clear filters and show all |
 | `n` | Rename the selected node (custom label) |
 | `?` | Show help |

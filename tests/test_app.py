@@ -286,38 +286,8 @@ async def test_escape_closes_filter_input():
 
 
 # ============================================================================
-# Filter: status filters (e / w / a) — call actions directly
+# Filter: clear all (c) — call action directly
 # ============================================================================
-
-
-@pytest.mark.asyncio
-async def test_status_filter_error_toggle():
-    """action_filter_errors should toggle ERROR filter on/off."""
-    app = _patched_app()
-    async with app.run_test() as pilot:
-        await app.action_filter_errors()
-        await pilot.pause()
-        assert app._status_filter == {PaneStatus.ERROR}
-
-        # Second call should clear the filter
-        await app.action_filter_errors()
-        await pilot.pause()
-        assert app._status_filter is None
-
-
-@pytest.mark.asyncio
-async def test_status_filter_waiting():
-    """action_filter_waiting should set WAITING_INPUT filter."""
-    app = _patched_app()
-    async with app.run_test() as pilot:
-        await app.action_filter_waiting()
-        await pilot.pause()
-        assert app._status_filter == {PaneStatus.WAITING_INPUT}
-
-        # Second call clears it
-        await app.action_filter_waiting()
-        await pilot.pause()
-        assert app._status_filter is None
 
 
 @pytest.mark.asyncio
@@ -326,8 +296,8 @@ async def test_filter_all_clears():
     from textual.widgets import Input
     app = _patched_app()
     async with app.run_test() as pilot:
-        # Set some filter state
-        await app.action_filter_errors()
+        # Set some filter state directly
+        app._status_filter = {PaneStatus.ERROR}
         await pilot.pause()
         assert app._status_filter is not None
 

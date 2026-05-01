@@ -98,22 +98,6 @@ class FilterState:
         self.status_filter: set[PaneStatus] | None = None
         self.name_filter: str = ""
 
-    def toggle_error(self) -> str:
-        """Toggle the ERROR status filter. Returns a human message."""
-        if self.status_filter == {PaneStatus.ERROR}:
-            self.status_filter = None
-            return "Error filter removed"
-        self.status_filter = {PaneStatus.ERROR}
-        return "Filtering by errors"
-
-    def toggle_waiting(self) -> str:
-        """Toggle the WAITING_INPUT status filter. Returns a human message."""
-        if self.status_filter == {PaneStatus.WAITING_INPUT}:
-            self.status_filter = None
-            return "Waiting filter removed"
-        self.status_filter = {PaneStatus.WAITING_INPUT}
-        return "Filtering by waiting"
-
     def clear_all(self) -> None:
         """Remove all filters."""
         self.status_filter = None
