@@ -863,6 +863,22 @@ async def test_poll_tmux_shows_error_on_exception():
 
 
 @pytest.mark.asyncio
+async def test_poll_tmux_suppresses_error_when_notify_disabled():
+    """When notify_poll_errors is False, poll errors should not be sent to notify channel."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
+    ])
+    app = _patched_app(tree=tree)
+    app._watcher.notify_poll_errors = False
+    async with app.run_test() as pilot:
+        app._notify_channel.send.reset_mock()
+        app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
+        await app._poll_tmux()
+        messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
+        assert not any("tmux down" in m for m in messages)
+
+
+@pytest.mark.asyncio
 async def test_poll_tmux_pauses_timer_on_exception():
     """When watcher.poll raises, the repeating poll timer should be paused."""
     tree = make_tree(sessions=[

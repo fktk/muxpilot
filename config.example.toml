@@ -34,3 +34,8 @@ poll_interval = 2.0
 # error_patterns = [
 #   '(?i)Error|Exception|Traceback|FAILED|panic|Segmentation fault|FATAL',
 # ]
+
+[notifications]
+# Show toast notifications when tmux polling fails.
+# Set to false to suppress "tmux poll failed" messages during normal use.
+poll_errors = true

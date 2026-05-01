@@ -75,3 +75,23 @@ def test_watcher_reads_poll_interval_from_config():
     finally:
         import os
         os.unlink(path)
+
+
+def test_watcher_notify_poll_errors_defaults_to_true():
+    client = make_mock_client()
+    watcher = TmuxWatcher(client)
+    assert watcher.notify_poll_errors is True
+
+
+def test_watcher_reads_notify_poll_errors_from_config():
+    import tempfile, pathlib
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+        f.write('[notifications]\npoll_errors = false\n')
+        path = f.name
+    client = make_mock_client()
+    try:
+        watcher = TmuxWatcher(client, config_path=pathlib.Path(path))
+        assert watcher.notify_poll_errors is False
+    finally:
+        import os
+        os.unlink(path)

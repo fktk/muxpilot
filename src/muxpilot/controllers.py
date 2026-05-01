@@ -73,7 +73,8 @@ class PollingController:
         try:
             tree, events = await asyncio.to_thread(self._watcher.poll)
         except Exception as e:
-            self._notify.send(f"tmux poll failed: {e}; retrying in {self._backoff}s")
+            if self._watcher.notify_poll_errors:
+                self._notify.send(f"tmux poll failed: {e}; retrying in {self._backoff}s")
             self._backoff = min(self._backoff * 2, MAX_POLL_BACKOFF_SECONDS)
             if self._poll_timer is not None:
                 self._poll_timer.pause()

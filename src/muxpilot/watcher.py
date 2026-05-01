@@ -61,6 +61,7 @@ class TmuxWatcher:
         self.poll_interval = poll_interval
         self.activities: dict[str, PaneActivity] = {}
         self._config_error: str | None = None
+        self.notify_poll_errors: bool = True
 
         # Load default patterns
         self.prompt_patterns = list(DEFAULT_PROMPT_PATTERNS)
@@ -85,6 +86,10 @@ class TmuxWatcher:
 
                     self.idle_threshold = watcher_cfg.get("idle_threshold", self.idle_threshold)
                     self.poll_interval = watcher_cfg.get("poll_interval", self.poll_interval)
+
+                    notify_cfg = config.get("notifications", {})
+                    if "poll_errors" in notify_cfg:
+                        self.notify_poll_errors = bool(notify_cfg["poll_errors"])
             except Exception as e:
                 self._config_error = str(e)
 
