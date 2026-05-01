@@ -39,11 +39,18 @@ class PaneInfo:
     is_self: bool = False
     custom_label: str = ""
     full_command: str = ""
+    pane_title: str = ""
+    repo_name: str = ""
+    branch: str = ""
+    idle_seconds: float = 0.0
+    recent_lines: list[str] = field(default_factory=list)
 
     @property
     def display_label(self) -> str:
         """Label for tree view display."""
         icon = STATUS_ICONS.get(self.status, "?")
+        if self.pane_title:
+            return f"{icon} {self.pane_title}"
         if self.custom_label:
             return f"{icon} {self.custom_label}"
 
@@ -139,6 +146,7 @@ class PaneActivity:
     idle_seconds: float = 0.0
     status: PaneStatus = PaneStatus.ACTIVE
     content_changed: bool = False
+    recent_lines: list[str] = field(default_factory=list)
 
 
 @dataclass

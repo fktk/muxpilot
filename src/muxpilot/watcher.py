@@ -54,11 +54,13 @@ class TmuxWatcher:
         capture_lines: int = 30,
         config_path: pathlib.Path | None = None,
         poll_interval: float = DEFAULT_POLL_INTERVAL,
+        preview_lines: int = 5,
     ) -> None:
         self.client = client
         self.idle_threshold = idle_threshold
         self.capture_lines = capture_lines
         self.poll_interval = poll_interval
+        self.preview_lines = preview_lines
         self.activities: dict[str, PaneActivity] = {}
         self._config_error: str | None = None
         self.notify_poll_errors: bool = True
@@ -159,6 +161,8 @@ class TmuxWatcher:
                 )
 
             pane.status = new_activity.status
+            pane.idle_seconds = new_activity.idle_seconds
+            pane.recent_lines = new_activity.recent_lines
             self.activities[pane.pane_id] = new_activity
 
         # Clean up activities for removed panes
@@ -182,6 +186,7 @@ class TmuxWatcher:
         content_str = "\n".join(content)
         content_hash = hashlib.md5(content_str.encode()).hexdigest()
         last_line = content[-1].strip() if content else ""
+        recent_lines = content[-self.preview_lines:] if content else []
 
         content_changed = not (old_activity and old_activity.last_content_hash == content_hash)
 
@@ -197,6 +202,7 @@ class TmuxWatcher:
             idle_seconds=idle_seconds,
             status=old_activity.status if old_activity else PaneStatus.ACTIVE,
             content_changed=content_changed,
+            recent_lines=recent_lines,
         )
 
     def _determine_status(

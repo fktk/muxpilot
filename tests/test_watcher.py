@@ -263,3 +263,18 @@ class TestPoll:
         _, events = w.poll()
         focus_events = [e for e in events if e.event_type == "focus_changed"]
         assert focus_events == []
+
+    def test_poll_sets_recent_lines_on_activity(self):
+        client = make_mock_client(capture_content=["line1", "line2", "line3"])
+        w = TmuxWatcher(client, preview_lines=2)
+        tree, _ = w.poll()
+        activity = w.activities.get(tree.all_panes()[0].pane_id)
+        assert activity is not None
+        assert activity.recent_lines == ["line2", "line3"]
+
+    def test_poll_sets_idle_seconds_on_pane_info(self):
+        tree = make_tree(sessions=[make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])])
+        client = make_mock_client(tree=tree, capture_content=["$ "])
+        w = TmuxWatcher(client)
+        tree, _ = w.poll()
+        assert tree.all_panes()[0].idle_seconds == 0.0

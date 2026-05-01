@@ -138,6 +138,20 @@ class TestPaneInfoDisplayLabel:
         assert "[]" not in label
         assert " — " in label
 
+    def test_display_label_prefers_pane_title(self) -> None:
+        pane = make_pane(pane_title="my-agent", custom_label="old-label", current_command="bash")
+        assert "my-agent" in pane.display_label
+        assert "old-label" not in pane.display_label
+
+    def test_display_label_fallback_to_custom_label(self) -> None:
+        pane = make_pane(pane_title="", custom_label="custom", current_command="bash")
+        assert "custom" in pane.display_label
+
+    def test_display_label_fallback_to_heuristic(self) -> None:
+        pane = make_pane(pane_title="", custom_label="", current_command="python", current_path="/home/user/proj")
+        assert "python" in pane.display_label
+        assert "user/proj" in pane.display_label
+
 
 # ============================================================================
 # WindowInfo.display_label

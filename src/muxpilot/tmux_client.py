@@ -48,7 +48,7 @@ class TmuxClient:
             "#{session_name}\t#{session_id}\t#{session_attached}\t"
             "#{window_id}\t#{window_name}\t#{window_index}\t#{window_active}\t"
             "#{pane_id}\t#{pane_index}\t#{pane_current_command}\t#{pane_current_path}\t"
-            "#{pane_active}\t#{pane_width}\t#{pane_height}\t#{pane_pid}"
+            "#{pane_active}\t#{pane_width}\t#{pane_height}\t#{pane_pid}\t#{pane_title}"
         )
 
         try:
@@ -69,7 +69,7 @@ class TmuxClient:
             if not line:
                 continue
             parts = line.split("\t")
-            if len(parts) < 15:
+            if len(parts) < 16:
                 continue
 
             session_name = parts[0]
@@ -88,6 +88,7 @@ class TmuxClient:
             pane_active = _is_active_str(parts[11])
             width = int(parts[12] or 0)
             height = int(parts[13] or 0)
+            pane_title = parts[15]
 
             if session_id not in sessions:
                 sessions[session_id] = SessionInfo(
@@ -118,7 +119,11 @@ class TmuxClient:
                 height=height,
                 is_self=(pane_id == self_pane_id),
                 full_command="",
+                pane_title=pane_title,
             )
+            git_info = self._get_git_info(pane_info.current_path)
+            pane_info.repo_name = git_info["repo_name"]
+            pane_info.branch = git_info["branch"]
             windows[window_id].panes.append(pane_info)
 
         tree.sessions = list(sessions.values())
@@ -183,6 +188,34 @@ class TmuxClient:
             return []
         except libtmux.exc.LibTmuxException:
             return []
+
+    def _get_git_info(self, path: str) -> dict[str, str]:
+        """Get repository name and current branch for a path."""
+        result = {"repo_name": "", "branch": ""}
+        if not path:
+            return result
+        try:
+            top = subprocess.run(
+                ["git", "-C", path, "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, timeout=1.0, check=True,
+            ).stdout.strip()
+            result["repo_name"] = top.split("/")[-1] if top else ""
+            branch = subprocess.run(
+                ["git", "-C", path, "branch", "--show-current"],
+                capture_output=True, text=True, timeout=1.0, check=True,
+            ).stdout.strip()
+            result["branch"] = branch
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return result
+
+    def set_pane_title(self, pane_id: str, title: str) -> bool:
+        """Set the tmux pane title."""
+        try:
+            self.server.cmd("select-pane", "-t", pane_id, "-T", title)
+            return True
+        except Exception:
+            return False
 
     def _find_pane(self, pane_id: str) -> libtmux.Pane | None:
         """Find a pane object by its ID across all sessions.
