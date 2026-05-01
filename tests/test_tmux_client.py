@@ -15,7 +15,7 @@ from muxpilot.tmux_client import (
 )
 
 
-def _mock_pane(pane_id="%0", cmd="bash", path="/home/user", active="1", w="80", h="24", pid="1234"):
+def _mock_pane(pane_id="%0", cmd="bash", path="/home/user", active="1", w="80", h="24", pid="1234", title=""):
     p = MagicMock()
     p.pane_id = pane_id
     p.pane_index = "0"
@@ -25,6 +25,7 @@ def _mock_pane(pane_id="%0", cmd="bash", path="/home/user", active="1", w="80", 
     p.pane_width = w
     p.pane_height = h
     p.pane_pid = pid
+    p.pane_title = title
     return p
 
 
@@ -228,3 +229,56 @@ class TestGetFullCommand:
         with patch("muxpilot.tmux_client.psutil.Process", side_effect=psutil.AccessDenied(1234)):
             result = c._get_full_command(p)
         assert result == "bash"
+
+
+class TestPaneTitleAndGit:
+    def test_get_tree_reads_pane_title(self):
+        p = _mock_pane(pane_id="%1", title="agent-1")
+        w = _mock_window(wid="@1", panes=[p])
+        s = _mock_session(sid="$1", windows=[w])
+        c = _client_with([s])
+        with patch.object(c, "_get_git_info", return_value={"repo_name": "", "branch": ""}):
+            tree = c.get_tree()
+        pane = tree.sessions[0].windows[0].panes[0]
+        assert pane.pane_title == "agent-1"
+
+    def test_get_tree_populates_git_info(self):
+        p = _mock_pane(pane_id="%1", path="/home/user/proj")
+        w = _mock_window(wid="@1", panes=[p])
+        s = _mock_session(sid="$1", windows=[w])
+        c = _client_with([s])
+        with patch.object(c, "_get_git_info", return_value={"repo_name": "proj", "branch": "main"}):
+            tree = c.get_tree()
+        pane = tree.sessions[0].windows[0].panes[0]
+        assert pane.repo_name == "proj"
+        assert pane.branch == "main"
+
+    def test_get_git_info_success(self):
+        c = _client_with([])
+        with patch("muxpilot.tmux_client.subprocess.run") as mock_run:
+            mock_run.side_effect = [
+                MagicMock(stdout="/home/user/proj\n", returncode=0),
+                MagicMock(stdout="feature/x\n", returncode=0),
+            ]
+            result = c._get_git_info("/home/user/proj")
+        assert result == {"repo_name": "proj", "branch": "feature/x"}
+
+    def test_get_git_info_not_a_repo(self):
+        import subprocess
+        c = _client_with([])
+        with patch("muxpilot.tmux_client.subprocess.run", side_effect=subprocess.CalledProcessError(128, "git")):
+            result = c._get_git_info("/tmp")
+        assert result == {"repo_name": "", "branch": ""}
+
+    def test_set_pane_title_calls_tmux(self):
+        c = _client_with([])
+        result = c.set_pane_title("%1", "new-title")
+        c.server.cmd.assert_called_once_with("select-pane", "-t", "%1", "-T", "new-title")
+        assert result is True
+
+    def test_set_pane_title_failure(self):
+        import libtmux.exc
+        c = _client_with([])
+        c.server.cmd.side_effect = libtmux.exc.LibTmuxException("fail")
+        result = c.set_pane_title("%1", "new-title")
+        assert result is False

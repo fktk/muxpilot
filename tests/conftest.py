@@ -27,6 +27,11 @@ def make_pane(
     is_self: bool = False,
     custom_label: str = "",
     full_command: str = "",
+    pane_title: str = "",
+    repo_name: str = "",
+    branch: str = "",
+    idle_seconds: float = 0.0,
+    recent_lines: list[str] | None = None,
 ) -> PaneInfo:
     """Create a PaneInfo with sensible defaults."""
     return PaneInfo(
@@ -41,6 +46,11 @@ def make_pane(
         is_self=is_self,
         custom_label=custom_label,
         full_command=full_command,
+        pane_title=pane_title,
+        repo_name=repo_name,
+        branch=branch,
+        idle_seconds=idle_seconds,
+        recent_lines=recent_lines or [],
     )
 
 

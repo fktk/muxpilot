@@ -129,13 +129,14 @@ class FilterState:
 class RenameController:
     """Manages the in-progress rename operation for a tree node.
 
-    Labels are kept only in memory (overlays).  They are never persisted to
-    disk — when the muxpilot process exits the overlays are lost.
+    Pane renames are applied directly to tmux via TmuxClient.set_pane_title().
+    Session/window renaming is not supported.
     """
 
-    def __init__(self) -> None:
-        self._overlays: dict[str, str] = {}
+    def __init__(self, client=None) -> None:
+        self._client = client
         self._key: str | None = None
+        self._pane_id: str | None = None
 
     @property
     def key(self) -> str | None:
@@ -145,66 +146,36 @@ class RenameController:
     def key(self, value: str | None) -> None:
         self._key = value
 
-    def get(self, key: str) -> str:
-        """Return the in-memory overlay label for *key*, or empty string."""
-        return self._overlays.get(key, "")
-
-    def set(self, key: str, value: str) -> None:
-        """Set (or delete if empty) an in-memory overlay label."""
-        if not value:
-            self.delete(key)
-            return
-        self._overlays[key] = value
-
-    def delete(self, key: str) -> None:
-        """Remove an in-memory overlay label."""
-        self._overlays.pop(key, None)
-
     def start(self, node_data: tuple[str, ...] | None) -> str | None:
         """Begin a rename for the given node data.
 
-        Returns the current overlay label (or empty string) if a rename can
+        Returns the current pane_title (or empty string) if a rename can
         start, or None if the node data does not support renaming.
         """
         if node_data is None:
             return None
         node_type, session, window, pane = node_data
-        if node_type == "session" and session:
-            self._key = session.session_name
-        elif node_type == "window" and session and window:
-            self._key = f"{session.session_name}.{window.window_index}"
-        elif node_type == "pane" and session and window and pane:
+        if node_type == "pane" and session and window and pane:
             self._key = f"{session.session_name}.{window.window_index}.{pane.pane_index}"
-        else:
-            return None
-        return self.get(self._key)
+            self._pane_id = pane.pane_id
+            return pane.pane_title
+        return None
 
     def finish(self, value: str) -> str | None:
         """Commit the rename and return the affected key, or None."""
         key = self._key
-        if key is None:
+        if key is None or self._client is None:
             return None
-        self.set(key, value)
+        self._client.set_pane_title(self._pane_id or "", value)
         self._key = None
+        self._pane_id = None
         return key
 
     def cancel(self) -> None:
         """Abort the rename without saving."""
         self._key = None
+        self._pane_id = None
 
     def apply(self, tree: TmuxTree) -> None:
-        """Apply in-memory overlay labels to a tree snapshot."""
-        for session in tree.sessions:
-            label = self._overlays.get(session.session_name)
-            if label is not None:
-                session.custom_label = label
-            for window in session.windows:
-                key = f"{session.session_name}.{window.window_index}"
-                label = self._overlays.get(key)
-                if label is not None:
-                    window.custom_label = label
-                for pane in window.panes:
-                    key = f"{session.session_name}.{window.window_index}.{pane.pane_index}"
-                    label = self._overlays.get(key)
-                    if label is not None:
-                        pane.custom_label = label
+        """No-op: pane_title comes from tmux directly on next poll."""
+        pass

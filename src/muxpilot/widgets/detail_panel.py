@@ -13,6 +13,7 @@ from muxpilot.models import (
     STATUS_ICONS,
     SessionInfo,
     WindowInfo,
+    _shorten_path,
 )
 
 
@@ -52,16 +53,39 @@ class DetailPanel(Widget):
         """Display pane details."""
         icon = STATUS_ICONS.get(pane.status, "?")
         status_name = pane.status.value if pane.status else "unknown"
+        idle_text = f" ({pane.idle_seconds:.1f}s idle)" if pane.idle_seconds > 0 else ""
+        title = pane.pane_title or "—"
+        repo = pane.repo_name or "—"
+        branch = pane.branch or "—"
 
         text = (
             f"[bold $accent]── Pane ──[/]\n"
             f"\n"
-            f"  [dim]ID:[/]        {pane.pane_id}\n"
-            f"  [dim]Command:[/]   {pane.current_command}\n"
-            f"  [dim]Path:[/]      {pane.current_path}\n"
-            f"  [dim]Size:[/]      {pane.width}×{pane.height}\n"
-            f"  [dim]Active:[/]    {'Yes' if pane.is_active else 'No'}\n"
-            f"  [dim]Status:[/]    {icon} {status_name}\n"
+            f"  [dim]Title:[/]       {title}\n"
+            f"  [dim]Repository:[/]  {repo}\n"
+            f"  [dim]Branch:[/]      {branch}\n"
+            f"  [dim]Command:[/]     {pane.full_command or pane.current_command}\n"
+            f"  [dim]Path:[/]        {_shorten_path(pane.current_path)}\n"
+            f"  [dim]Size:[/]        {pane.width}×{pane.height}\n"
+            f"  [dim]Active:[/]      {'Yes' if pane.is_active else 'No'}\n"
+            f"  [dim]Status:[/]      {icon} {status_name}{idle_text}\n"
+        )
+
+        if pane.status == PaneStatus.ERROR:
+            text += "\n  [bold $error]Status is ERROR[/]\n"
+        elif pane.status == PaneStatus.WAITING_INPUT:
+            text += "\n  [bold $warning]Waiting for input[/]\n"
+
+        text += (
+            f"\n"
+            f"[bold $accent]── Recent Output ──[/]\n"
+        )
+        preview = pane.recent_lines if pane.recent_lines else ["(no output)"]
+        for line in preview:
+            safe = line if line.strip() else "(blank)"
+            text += f"  {safe}\n"
+
+        text += (
             f"\n"
             f"  [dim]Window:[/]    {window.window_name} (#{window.window_index})\n"
             f"  [dim]Session:[/]   {session.session_name}\n"

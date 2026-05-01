@@ -31,100 +31,69 @@ def make_node_data(node_type: str, session_name="work", window_index=0, pane_ind
         is_active=True,
         width=80,
         height=24,
+        pane_title="",
     )
     return (node_type, session, window, pane)
 
 
-class TestRenameControllerOverlay:
-    """RenameController stores labels only in memory (no persistence)."""
+class TestRenameControllerPaneTitle:
+    """RenameController sets tmux pane_title directly via TmuxClient."""
 
-    def test_get_returns_empty_when_no_overlay(self) -> None:
-        ctrl = RenameController()
-        assert ctrl.get("work") == ""
-
-    def test_set_and_get(self) -> None:
-        ctrl = RenameController()
-        ctrl.set("work", "My Project")
-        assert ctrl.get("work") == "My Project"
-
-    def test_set_overwrites_existing(self) -> None:
-        ctrl = RenameController()
-        ctrl.set("work", "old")
-        ctrl.set("work", "new")
-        assert ctrl.get("work") == "new"
-
-    def test_delete_removes_overlay(self) -> None:
-        ctrl = RenameController()
-        ctrl.set("work", "label")
-        ctrl.delete("work")
-        assert ctrl.get("work") == ""
-
-    def test_empty_value_treated_as_delete(self) -> None:
-        ctrl = RenameController()
-        ctrl.set("work", "label")
-        ctrl.set("work", "")
-        assert ctrl.get("work") == ""
-
-    def test_start_session_key(self) -> None:
-        ctrl = RenameController()
-        data = make_node_data("session", session_name="myproject")
-        current = ctrl.start(data)
-        assert ctrl.key == "myproject"
-        assert current == ""
-
-    def test_start_window_key(self) -> None:
-        ctrl = RenameController()
-        data = make_node_data("window", session_name="myproject", window_index=2)
-        current = ctrl.start(data)
-        assert ctrl.key == "myproject.2"
-        assert current == ""
-
-    def test_start_pane_key(self) -> None:
-        ctrl = RenameController()
+    def test_start_returns_pane_title(self) -> None:
+        from unittest.mock import MagicMock
+        client = MagicMock()
+        ctrl = RenameController(client)
         data = make_node_data("pane", session_name="myproject", window_index=2, pane_index=1)
+        data[3].pane_title = "existing-title"
         current = ctrl.start(data)
         assert ctrl.key == "myproject.2.1"
-        assert current == ""
-
-    def test_start_returns_existing_overlay(self) -> None:
-        ctrl = RenameController()
-        ctrl.set("myproject", "Existing")
-        data = make_node_data("session", session_name="myproject")
-        current = ctrl.start(data)
-        assert current == "Existing"
+        assert ctrl._pane_id == "%0"
+        assert current == "existing-title"
 
     def test_start_none_returns_none(self) -> None:
-        ctrl = RenameController()
+        from unittest.mock import MagicMock
+        client = MagicMock()
+        ctrl = RenameController(client)
         assert ctrl.start(None) is None
 
-    def test_finish_sets_overlay(self) -> None:
-        ctrl = RenameController()
-        ctrl.start(make_node_data("session", session_name="work"))
-        result = ctrl.finish("New Label")
-        assert result == "work"
-        assert ctrl.get("work") == "New Label"
+    def test_finish_calls_set_pane_title(self) -> None:
+        from unittest.mock import MagicMock
+        client = MagicMock()
+        client.set_pane_title.return_value = True
+        ctrl = RenameController(client)
+        ctrl.start(make_node_data("pane", session_name="work"))
+        result = ctrl.finish("New Title")
+        assert result == "work.0.0"
+        client.set_pane_title.assert_called_once_with("%0", "New Title")
 
-    def test_finish_empty_deletes_overlay(self) -> None:
-        ctrl = RenameController()
-        ctrl.set("work", "Existing")
-        ctrl.start(make_node_data("session", session_name="work"))
+    def test_finish_empty_calls_set_pane_title(self) -> None:
+        from unittest.mock import MagicMock
+        client = MagicMock()
+        client.set_pane_title.return_value = True
+        ctrl = RenameController(client)
+        ctrl.start(make_node_data("pane", session_name="work"))
         result = ctrl.finish("")
-        assert result == "work"
-        assert ctrl.get("work") == ""
+        assert result == "work.0.0"
+        client.set_pane_title.assert_called_once_with("%0", "")
 
     def test_finish_without_start_is_noop(self) -> None:
-        ctrl = RenameController()
+        from unittest.mock import MagicMock
+        client = MagicMock()
+        ctrl = RenameController(client)
         assert ctrl.finish("x") is None
+        client.set_pane_title.assert_not_called()
 
     def test_cancel_clears_key_without_saving(self) -> None:
-        ctrl = RenameController()
-        ctrl.start(make_node_data("session", session_name="work"))
+        from unittest.mock import MagicMock
+        client = MagicMock()
+        ctrl = RenameController(client)
+        ctrl.start(make_node_data("pane", session_name="work"))
         ctrl.cancel()
         assert ctrl.key is None
-        assert ctrl.get("work") == ""
+        assert ctrl._pane_id is None
 
-    def test_apply_to_tree(self) -> None:
-        """apply() should set custom_label on the tree from overlays."""
+    def test_apply_is_noop(self) -> None:
+        from unittest.mock import MagicMock
         from muxpilot.models import TmuxTree
         from conftest import make_session, make_window, make_pane
 
@@ -136,35 +105,10 @@ class TestRenameControllerOverlay:
             ])
         ])
 
-        ctrl = RenameController()
-        ctrl.set("work", "Project A")
-        ctrl.set("work.0", "Editor Window")
-        ctrl.set("work.0.0", "Main Pane")
-
-        ctrl.apply(tree)
-
-        assert tree.sessions[0].custom_label == "Project A"
-        assert tree.sessions[0].windows[0].custom_label == "Editor Window"
-        assert tree.sessions[0].windows[0].panes[0].custom_label == "Main Pane"
-
-    def test_apply_skips_missing_overlays(self) -> None:
-        from muxpilot.models import TmuxTree
-        from conftest import make_session, make_window, make_pane
-
-        tree = TmuxTree(sessions=[
-            make_session(session_name="work", windows=[
-                make_window(window_index=0, panes=[make_pane(pane_index=0)])
-            ])
-        ])
-
-        ctrl = RenameController()
+        client = MagicMock()
+        ctrl = RenameController(client)
         ctrl.apply(tree)
 
         assert tree.sessions[0].custom_label == ""
-
-    def test_overlay_does_not_persist_across_instances(self) -> None:
-        ctrl1 = RenameController()
-        ctrl1.set("work", "temp")
-
-        ctrl2 = RenameController()
-        assert ctrl2.get("work") == ""
+        assert tree.sessions[0].windows[0].custom_label == ""
+        assert tree.sessions[0].windows[0].panes[0].custom_label == ""
