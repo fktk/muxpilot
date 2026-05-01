@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import time
 
 import libtmux
@@ -75,7 +76,11 @@ class TmuxClient:
                         height=int(pane.pane_height or 0),
                         is_self=(pane_id == self_pane_id),
                         full_command=self._get_full_command(pane),
+                        pane_title=pane.pane_title or "",
                     )
+                    git_info = self._get_git_info(pane_info.current_path)
+                    pane_info.repo_name = git_info["repo_name"]
+                    pane_info.branch = git_info["branch"]
                     window_info.panes.append(pane_info)
 
                 session_info.windows.append(window_info)
@@ -147,6 +152,34 @@ class TmuxClient:
             return []
         except libtmux.exc.LibTmuxException:
             return []
+
+    def _get_git_info(self, path: str) -> dict[str, str]:
+        """Get repository name and current branch for a path."""
+        result = {"repo_name": "", "branch": ""}
+        if not path:
+            return result
+        try:
+            top = subprocess.run(
+                ["git", "-C", path, "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, timeout=1.0, check=True,
+            ).stdout.strip()
+            result["repo_name"] = top.split("/")[-1] if top else ""
+            branch = subprocess.run(
+                ["git", "-C", path, "branch", "--show-current"],
+                capture_output=True, text=True, timeout=1.0, check=True,
+            ).stdout.strip()
+            result["branch"] = branch
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return result
+
+    def set_pane_title(self, pane_id: str, title: str) -> bool:
+        """Set the tmux pane title."""
+        try:
+            self.server.cmd("select-pane", "-t", pane_id, "-T", title)
+            return True
+        except Exception:
+            return False
 
     def _find_pane(self, pane_id: str) -> libtmux.Pane | None:
         """Find a pane object by its ID across all sessions.
