@@ -94,7 +94,7 @@ class MuxpilotApp(App[str | None]):
         Binding("q", "quit", "Quit", priority=True),
         Binding("question_mark", "help", "Help", show=False),
         Binding("slash", "filter", "Filter"),
-        Binding("c", "filter_all", "Show all"),
+        Binding("a", "filter_all", "Show all"),
         Binding("n", "rename", "Rename"),
         Binding("x", "kill_pane", "Kill pane"),
     ]

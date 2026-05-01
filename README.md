@@ -15,7 +15,7 @@ It is designed specifically for **AI agent orchestration** and managing tasks ru
 - **⌨️ Keyboard Navigation**: Vim-like keybindings (`j`/`k`) for quickly moving between panes.
 - **🔍 Filtering**:
   - `/`: Filter by name (session name, command, path, etc.)
-  - `c`: Clear filters and show all
+  - `a`: Clear filters and show all
 - **👀 Status Monitoring**: Periodically polls each pane's output and automatically assigns one of three status icons:
 
   | Icon | Status | Detection Condition |
@@ -82,7 +82,7 @@ See `config.example.toml` for more details.
 | `Enter` | Jump to selected pane (muxpilot continues running in the background) |
 | `a` | Collapse / expand all nodes (toggle) |
 | `/` | Toggle filter input on/off |
-| `c` | Clear filters and show all |
+| `a` | Clear filters and show all |
 | `n` | Rename the selected node (custom label) |
 | `?` | Show help |
 | `q` | Quit |
