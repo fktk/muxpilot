@@ -372,9 +372,11 @@ async def test_status_bar_shows_icon_legend():
         sb = app.query_one("#status-bar", StatusBar)
         text = str(sb.render())
 
-        # Each status icon and its label should appear
+        # Each status icon (rendered as plain bold letter) and its label should appear
         for status, icon in STATUS_ICONS.items():
-            assert icon in text, f"Icon {icon!r} for {status.value} not found in status bar"
+            plain_icon = icon.replace("[bold]", "").replace("[/bold]", "")
+            assert plain_icon in text, f"Icon {plain_icon!r} for {status.value} not found in status bar"
+            assert status.value in text, f"Label {status.value!r} not found in status bar"
 
 
 def _all_nodes(tw: TmuxTreeView):

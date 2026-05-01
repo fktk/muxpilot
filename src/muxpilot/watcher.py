@@ -136,6 +136,16 @@ class TmuxWatcher:
             old_activity = self.activities.get(pane.pane_id)
             new_activity = self._analyze_pane(pane.pane_id, content, old_activity, poll_elapsed)
 
+            old_status = old_activity.status if old_activity else PaneStatus.ACTIVE
+            new_status = self._determine_status(
+                content,
+                new_activity.last_line,
+                new_activity.idle_seconds,
+                old_status,
+                new_activity.content_changed,
+            )
+            new_activity.status = new_status
+
             # Check for status change
             if old_activity and old_activity.status != new_activity.status:
                 events.append(
@@ -168,26 +178,25 @@ class TmuxWatcher:
         old_activity: PaneActivity | None,
         poll_elapsed: float,
     ) -> PaneActivity:
-        """Analyze pane content and determine its status."""
+        """Analyze pane content and track idle time."""
         content_str = "\n".join(content)
         content_hash = hashlib.md5(content_str.encode()).hexdigest()
         last_line = content[-1].strip() if content else ""
 
-        # Determine if content has changed
-        if old_activity and old_activity.last_content_hash == content_hash:
+        content_changed = not (old_activity and old_activity.last_content_hash == content_hash)
+
+        if old_activity and not content_changed:
             idle_seconds = old_activity.idle_seconds + poll_elapsed
         else:
             idle_seconds = 0.0
-
-        # Determine status
-        status = self._determine_status(content, last_line, idle_seconds)
 
         return PaneActivity(
             pane_id=pane_id,
             last_content_hash=content_hash,
             last_line=last_line,
             idle_seconds=idle_seconds,
-            status=status,
+            status=old_activity.status if old_activity else PaneStatus.ACTIVE,
+            content_changed=content_changed,
         )
 
     def _determine_status(
@@ -195,8 +204,18 @@ class TmuxWatcher:
         content: list[str],
         last_line: str,
         idle_seconds: float,
+        old_status: PaneStatus,
+        content_changed: bool,
     ) -> PaneStatus:
-        """Determine the pane status based on output patterns."""
+        """Determine the pane status based on output patterns.
+
+        Once a pane leaves ACTIVE, it keeps its status until content changes.
+        """
+        # If content hasn't changed and we were already in a non-ACTIVE state,
+        # preserve that status until new activity resets us.
+        if not content_changed and old_status != PaneStatus.ACTIVE:
+            return old_status
+
         # Check for error patterns in recent output
         recent_lines = content[-10:] if content else []
         for line in recent_lines:
@@ -209,7 +228,10 @@ class TmuxWatcher:
             if pattern.search(last_line):
                 return PaneStatus.WAITING_INPUT
 
-        # Default to active
+        # Check if the pane has been idle long enough
+        if idle_seconds >= self.idle_threshold:
+            return PaneStatus.IDLE
+
         return PaneStatus.ACTIVE
 
     def _detect_structural_changes(

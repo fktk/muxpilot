@@ -12,13 +12,15 @@ class PaneStatus(Enum):
     ACTIVE = "active"          # 実行中（出力変化あり、または変化停止中）
     WAITING_INPUT = "waiting"  # プロンプト表示中（指示待ち）
     ERROR = "error"            # エラーパターン検出
+    IDLE = "idle"              # 一定時間以上出力変化なし
 
 
 # ステータスに対応するアイコン
 STATUS_ICONS: dict[PaneStatus, str] = {
-    PaneStatus.ACTIVE: "●",
-    PaneStatus.WAITING_INPUT: "◆",
-    PaneStatus.ERROR: "▲",
+    PaneStatus.ACTIVE: "[bold]A[/bold]",
+    PaneStatus.WAITING_INPUT: "[bold]W[/bold]",
+    PaneStatus.ERROR: "[bold]E[/bold]",
+    PaneStatus.IDLE: "[bold]I[/bold]",
 }
 
 
@@ -136,6 +138,7 @@ class PaneActivity:
     last_line: str = ""
     idle_seconds: float = 0.0
     status: PaneStatus = PaneStatus.ACTIVE
+    content_changed: bool = False
 
 
 @dataclass
