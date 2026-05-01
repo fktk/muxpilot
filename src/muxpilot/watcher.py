@@ -41,7 +41,7 @@ DEFAULT_ERROR_PATTERNS: list[re.Pattern[str]] = [
 
 # Idle threshold in seconds before a pane is considered idle
 DEFAULT_IDLE_THRESHOLD: float = 10.0
-DEFAULT_POLL_INTERVAL: float = 2.0
+DEFAULT_POLL_INTERVAL: float = 5.0
 
 
 class TmuxWatcher:

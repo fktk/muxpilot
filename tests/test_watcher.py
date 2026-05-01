@@ -12,13 +12,15 @@ from muxpilot.watcher import TmuxWatcher
 from conftest import make_mock_client, make_pane, make_session, make_tree, make_window
 
 
+import pathlib
+
 def _make_watcher(
-    tree=None, capture=None, current_pane_id=None, idle_threshold=10.0
+    tree=None, capture=None, current_pane_id=None, idle_threshold=10.0, config_path=pathlib.Path("/nonexistent-muxpilot-config")
 ):
     client = make_mock_client(
         tree=tree, capture_content=capture, current_pane_id=current_pane_id
     )
-    return TmuxWatcher(client, idle_threshold=idle_threshold)
+    return TmuxWatcher(client, idle_threshold=idle_threshold, config_path=config_path)
 
 
 class TestDetermineStatus:
