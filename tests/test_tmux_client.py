@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,8 +11,10 @@ import pytest
 from muxpilot.tmux_client import (
     TmuxClient,
     _is_active_pane,
+    _is_active_str,
     _is_active_window,
     _is_attached,
+    _is_attached_str,
 )
 
 
@@ -75,45 +78,68 @@ class TestEnv:
             assert TmuxClient().get_current_pane_id() is None
 
 
+def _list_panes_output(lines: list[str]):
+    class _Result:
+        def __init__(self, stdout: str, stderr: str = "", returncode: int = 0):
+            self.stdout = stdout
+            self.stderr = stderr
+            self.returncode = returncode
+
+        def check_returncode(self):
+            if self.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    self.returncode, "tmux", output=self.stdout, stderr=self.stderr
+                )
+    return _Result("\n".join(lines))
+
+
 class TestGetTree:
     def test_basic(self):
-        c = _client_with([_mock_session(sname="dev")])
-        t = c.get_tree()
+        line = "dev\t$0\t1\t@0\teditor\t0\t1\t%0\t0\tbash\t/home/user\t1\t80\t24\t1234"
+        with patch("muxpilot.tmux_client.subprocess.run", return_value=_list_panes_output([line])):
+            c = TmuxClient()
+            t = c.get_tree()
         assert t.total_sessions == 1
+        assert t.total_windows == 1
+        assert t.total_panes == 1
         assert t.sessions[0].session_name == "dev"
+        assert t.sessions[0].session_id == "$0"
+        assert t.sessions[0].is_attached is True
+        assert t.sessions[0].windows[0].window_name == "editor"
+        assert t.sessions[0].windows[0].panes[0].pane_id == "%0"
 
     def test_multiple(self):
-        p = [_mock_pane(pane_id=f"%{i}") for i in range(4)]
-        w1 = _mock_window(wid="@0", panes=p[:2])
-        w2 = _mock_window(wid="@1", panes=[p[2]])
-        w3 = _mock_window(wid="@2", panes=[p[3]])
-        s1 = _mock_session(sid="$0", windows=[w1, w2])
-        s2 = _mock_session(sid="$1", windows=[w3])
-        t = _client_with([s1, s2]).get_tree()
+        lines = [
+            "s0\t$0\t1\t@0\tw0\t0\t1\t%0\t0\tbash\t/home/user\t1\t80\t24\t1234",
+            "s0\t$0\t1\t@0\tw0\t0\t1\t%1\t1\tvim\t/home/user\t0\t80\t24\t1235",
+            "s0\t$0\t1\t@1\tw1\t1\t0\t%2\t0\tpython\t/home/user\t1\t80\t24\t1236",
+            "s1\t$1\t0\t@2\tw2\t0\t1\t%3\t0\tzsh\t/home/user\t1\t80\t24\t1237",
+        ]
+        with patch("muxpilot.tmux_client.subprocess.run", return_value=_list_panes_output(lines)):
+            c = TmuxClient()
+            t = c.get_tree()
         assert t.total_sessions == 2
         assert t.total_windows == 3
         assert t.total_panes == 4
 
     def test_empty(self):
-        t = _client_with([]).get_tree()
+        with patch("muxpilot.tmux_client.subprocess.run", return_value=_list_panes_output([])):
+            c = TmuxClient()
+            t = c.get_tree()
         assert t.total_sessions == 0
 
     def test_none_values(self):
-        p = _mock_pane()
-        p.pane_current_command = None
-        p.pane_current_path = None
-        p.pane_width = None
-        p.pane_height = None
-        w = _mock_window(panes=[p])
-        w.window_name = None
-        w.window_index = None
-        s = _mock_session(windows=[w])
-        s.session_name = None
-        s.session_id = None
-        t = _client_with([s]).get_tree()
+        line = "\t" * 14
+        with patch("muxpilot.tmux_client.subprocess.run", return_value=_list_panes_output([line])):
+            c = TmuxClient()
+            t = c.get_tree()
         pi = t.sessions[0].windows[0].panes[0]
         assert pi.current_command == ""
+        assert pi.current_path == ""
         assert pi.width == 0
+        assert pi.height == 0
+        assert pi.pane_index == 0
+        assert pi.is_active is False
 
 
 class TestNavigateTo:

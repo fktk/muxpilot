@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import time
 
 import libtmux
@@ -42,50 +43,85 @@ class TmuxClient:
         """Fetch the complete tmux session/window/pane hierarchy."""
         tree = TmuxTree(timestamp=time.time())
         self_pane_id = self.get_current_pane_id()
-        pane_cache: dict[str, libtmux.Pane] = {}
 
-        for session in self.server.sessions:
-            session_info = SessionInfo(
-                session_name=session.session_name or "",
-                session_id=session.session_id or "",
-                is_attached=_is_attached(session),
-                windows=[],
+        fmt = (
+            "#{session_name}\t#{session_id}\t#{session_attached}\t"
+            "#{window_id}\t#{window_name}\t#{window_index}\t#{window_active}\t"
+            "#{pane_id}\t#{pane_index}\t#{pane_current_command}\t#{pane_current_path}\t"
+            "#{pane_active}\t#{pane_width}\t#{pane_height}\t#{pane_pid}"
+        )
+
+        try:
+            result = subprocess.run(
+                ["tmux", "list-panes", "-a", "-F", fmt],
+                capture_output=True,
+                text=True,
+                timeout=5.0,
             )
+            result.check_returncode()
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            return tree
 
-            for window in session.windows:
-                window_info = WindowInfo(
-                    window_id=window.window_id or "",
-                    window_name=window.window_name or "",
-                    window_index=int(window.window_index or 0),
-                    is_active=_is_active_window(window),
-                    panes=[],
+        sessions: dict[str, SessionInfo] = {}
+        windows: dict[str, WindowInfo] = {}
+
+        for line in result.stdout.splitlines():
+            if not line:
+                continue
+            parts = line.split("\t")
+            if len(parts) < 15:
+                continue
+
+            session_name = parts[0]
+            session_id = parts[1]
+            session_attached = _is_attached_str(parts[2])
+
+            window_id = parts[3]
+            window_name = parts[4]
+            window_index = int(parts[5] or 0)
+            window_active = _is_active_str(parts[6])
+
+            pane_id = parts[7]
+            pane_index = int(parts[8] or 0)
+            current_command = parts[9]
+            current_path = parts[10]
+            pane_active = _is_active_str(parts[11])
+            width = int(parts[12] or 0)
+            height = int(parts[13] or 0)
+
+            if session_id not in sessions:
+                sessions[session_id] = SessionInfo(
+                    session_name=session_name,
+                    session_id=session_id,
+                    is_attached=session_attached,
+                    windows=[],
                 )
 
-                for pane in window.panes:
-                    pane_id = pane.pane_id or ""
-                    if pane_id:
-                        pane_cache[pane_id] = pane
-                    pane_info = PaneInfo(
-                        pane_id=pane_id,
-                        pane_index=int(pane.pane_index or 0),
-                        current_command=pane.pane_current_command or "",
-                        current_path=pane.pane_current_path or "",
-                        is_active=_is_active_pane(pane),
-                        width=int(pane.pane_width or 0),
-                        height=int(pane.pane_height or 0),
-                        is_self=(pane_id == self_pane_id),
-                        full_command=self._get_full_command(pane),
-                    )
-                    window_info.panes.append(pane_info)
+            if window_id not in windows:
+                window_info = WindowInfo(
+                    window_id=window_id,
+                    window_name=window_name,
+                    window_index=window_index,
+                    is_active=window_active,
+                    panes=[],
+                )
+                windows[window_id] = window_info
+                sessions[session_id].windows.append(window_info)
 
-                session_info.windows.append(window_info)
+            pane_info = PaneInfo(
+                pane_id=pane_id,
+                pane_index=pane_index,
+                current_command=current_command,
+                current_path=current_path,
+                is_active=pane_active,
+                width=width,
+                height=height,
+                is_self=(pane_id == self_pane_id),
+                full_command="",
+            )
+            windows[window_id].panes.append(pane_info)
 
-            tree.sessions.append(session_info)
-
-        # Update pane cache so subsequent lookups (e.g. capture_pane) don't
-        # re-fetch the entire tree via N+1 tmux commands.
-        self._pane_cache = pane_cache
-
+        tree.sessions = list(sessions.values())
         return tree
 
     def navigate_to(self, pane_id: str) -> bool:
@@ -185,5 +221,21 @@ def _is_active_pane(pane: libtmux.Pane) -> bool:
     """Check if a pane is the active pane in its window."""
     try:
         return int(pane.pane_active or 0) > 0
+    except (ValueError, TypeError):
+        return False
+
+
+def _is_attached_str(value: str) -> bool:
+    """Check if a session is attached from a string value."""
+    try:
+        return int(value) > 0
+    except (ValueError, TypeError):
+        return False
+
+
+def _is_active_str(value: str) -> bool:
+    """Check if a window or pane is active from a string value."""
+    try:
+        return int(value) > 0
     except (ValueError, TypeError):
         return False
