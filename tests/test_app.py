@@ -19,6 +19,21 @@ from muxpilot.widgets.tree_view import TmuxTreeView
 from conftest import make_mock_client, make_mock_notify_channel, make_pane, make_session, make_tree, make_window
 
 
+def _run_detail_panel(panel):
+    """Wrap a DetailPanel in a minimal App and run it in a test context.
+
+    Yields the panel after mount so callers can inspect _markdown_source.
+    """
+    from textual.app import App
+    from textual.app import ComposeResult
+
+    class _TestApp(App):
+        def compose(self) -> ComposeResult:
+            yield panel
+
+    return _TestApp()
+
+
 def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error=None, config_path=None):
     """Create a MuxpilotApp with a mocked TmuxClient/Watcher."""
     mock_client = make_mock_client(tree=tree, current_pane_id=current_pane_id)
@@ -87,17 +102,20 @@ async def test_detail_panel_shows_pane_title_and_git():
     ])
     window = session.windows[0]
     pane = window.panes[0]
-    panel.show_pane(pane, window, session)
-    text = panel._markdown_source
-    assert "agent-a" in text
-    assert "proj" in text
-    assert "feat/x" in text
-    assert "12.0s idle" in text
-    assert "line1" in text
-    assert "line2" in text
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_pane(pane, window, session)
+        text = panel._markdown_source
+        assert "agent-a" in text
+        assert "proj" in text
+        assert "feat/x" in text
+        assert "12.0s idle" in text
+        assert "line1" in text
+        assert "line2" in text
 
 
-def test_detail_panel_error_status_shows_clean_icon():
+@pytest.mark.asyncio
+async def test_detail_panel_error_status_shows_clean_icon():
     """Detail panel should render ERROR status icon cleanly without broken markup."""
     from muxpilot.widgets.detail_panel import DetailPanel
     panel = DetailPanel()
@@ -108,15 +126,17 @@ def test_detail_panel_error_status_shows_clean_icon():
     ])
     window = session.windows[0]
     pane = window.panes[0]
-    panel.show_pane(pane, window, session)
-    text = panel._markdown_source
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_pane(pane, window, session)
+        text = panel._markdown_source
 
-    # Should NOT contain broken/unclosed markup fragments
-    assert "[bold" not in text, f"Broken bold markup found: {text}"
-    assert "red]" not in text, f"Broken red markup found: {text}"
-    # Should show the bold letter E in Markdown
-    assert "**E**" in text, f"Bold E not found in status line: {text}"
-    assert "error" in text
+        # Should NOT contain broken/unclosed markup fragments
+        assert "[bold" not in text, f"Broken bold markup found: {text}"
+        assert "red]" not in text, f"Broken red markup found: {text}"
+        # Should show the bold letter E in Markdown
+        assert "**E**" in text, f"Bold E not found in status line: {text}"
+        assert "error" in text
 
 
 @pytest.mark.asyncio
@@ -131,33 +151,35 @@ async def test_detail_panel_pane_shows_session_and_window_before_title():
     ])
     window = session.windows[0]
     pane = window.panes[0]
-    panel.show_pane(pane, window, session)
-    text = panel._markdown_source
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_pane(pane, window, session)
+        text = panel._markdown_source
 
-    pane_section_start = text.find("## Pane")
-    recent_output_start = text.find("## Recent Output")
-    assert pane_section_start != -1
-    assert recent_output_start != -1
-    assert pane_section_start < recent_output_start
+        pane_section_start = text.find("## Pane")
+        recent_output_start = text.find("## Recent Output")
+        assert pane_section_start != -1
+        assert recent_output_start != -1
+        assert pane_section_start < recent_output_start
 
-    session_pos = text.find("- **Session:** my-session")
-    window_pos = text.find("- **Window:** my-window (#3)")
-    title_pos = text.find("- **Title:** agent-a")
+        session_pos = text.find("- **Session:** my-session")
+        window_pos = text.find("- **Window:** my-window (#3)")
+        title_pos = text.find("- **Title:** agent-a")
 
-    assert session_pos != -1, "Session info missing"
-    assert window_pos != -1, "Window info missing"
-    assert title_pos != -1, "Title info missing"
+        assert session_pos != -1, "Session info missing"
+        assert window_pos != -1, "Window info missing"
+        assert title_pos != -1, "Title info missing"
 
-    assert pane_section_start < session_pos < recent_output_start, "Session should be inside Pane section"
-    assert pane_section_start < window_pos < recent_output_start, "Window should be inside Pane section"
-    assert pane_section_start < title_pos < recent_output_start, "Title should be inside Pane section"
+        assert pane_section_start < session_pos < recent_output_start, "Session should be inside Pane section"
+        assert pane_section_start < window_pos < recent_output_start, "Window should be inside Pane section"
+        assert pane_section_start < title_pos < recent_output_start, "Title should be inside Pane section"
 
-    assert session_pos < window_pos < title_pos, "Order should be Session -> Window -> Title"
+        assert session_pos < window_pos < title_pos, "Order should be Session -> Window -> Title"
 
-    # Ensure Session/Window do not appear after Recent Output
-    after_recent = text[recent_output_start:]
-    assert "**Session:**" not in after_recent, "Session should not repeat after Recent Output"
-    assert "**Window:**" not in after_recent, "Window should not repeat after Recent Output"
+        # Ensure Session/Window do not appear after Recent Output
+        after_recent = text[recent_output_start:]
+        assert "**Session:**" not in after_recent, "Session should not repeat after Recent Output"
+        assert "**Window:**" not in after_recent, "Window should not repeat after Recent Output"
 
 
 @pytest.mark.asyncio
@@ -171,18 +193,20 @@ async def test_detail_panel_window_shows_session_first():
         ])
     ])
     window = session.windows[0]
-    panel.show_window(window, session)
-    text = panel._markdown_source
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_window(window, session)
+        text = panel._markdown_source
 
-    window_section_start = text.find("## Window")
-    session_pos = text.find("- **Session:** my-session")
-    name_pos = text.find("- **Name:** my-window")
+        window_section_start = text.find("## Window")
+        session_pos = text.find("- **Session:** my-session")
+        name_pos = text.find("- **Name:** my-window")
 
-    assert window_section_start != -1
-    assert session_pos != -1, "Session info missing"
-    assert name_pos != -1, "Name info missing"
+        assert window_section_start != -1
+        assert session_pos != -1, "Session info missing"
+        assert name_pos != -1, "Name info missing"
 
-    assert window_section_start < session_pos < name_pos, "Session should appear before Name in Window section"
+        assert window_section_start < session_pos < name_pos, "Session should appear before Name in Window section"
 
 
 @pytest.mark.asyncio
@@ -197,9 +221,11 @@ async def test_detail_panel_window_does_not_show_pane_count():
         ])
     ])
     window = session.windows[0]
-    panel.show_window(window, session)
-    text = panel._markdown_source
-    assert "**Panes:**" not in text
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_window(window, session)
+        text = panel._markdown_source
+        assert "**Panes:**" not in text
 
 
 @pytest.mark.asyncio
@@ -211,9 +237,11 @@ async def test_detail_panel_session_does_not_show_counts():
         make_window(window_name="w1", window_index=0, panes=[make_pane(pane_id="%0")]),
         make_window(window_name="w2", window_index=1, panes=[make_pane(pane_id="%1"), make_pane(pane_id="%2")]),
     ])
-    panel.show_session(session)
-    text = panel._markdown_source
-    assert "**Windows:**" not in text
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_session(session)
+        text = panel._markdown_source
+        assert "**Windows:**" not in text
     assert "**Panes:**" not in text
 
 

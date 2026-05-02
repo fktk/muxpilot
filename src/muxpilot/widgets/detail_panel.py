@@ -5,8 +5,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widget import Widget
-from textual.widgets import Static
-from rich.markdown import Markdown as RichMarkdown
+from textual.widgets import Markdown, Static
 
 from muxpilot.models import (
     PaneInfo,
@@ -41,11 +40,15 @@ class DetailPanel(Widget):
     DetailPanel .detail-label {
         color: $text-muted;
     }
+
+    DetailPanel Markdown H2 {
+        color: $accent;
+    }
     """
 
     def __init__(self, name: str | None = None, id: str | None = None) -> None:
         super().__init__(name=name, id=id)
-        self._content = Static("Select a node to see details", id="detail-content")
+        self._content = Markdown("Select a node to see details", id="detail-content")
         self._markdown_source = ""
 
     def compose(self) -> ComposeResult:
@@ -94,7 +97,7 @@ class DetailPanel(Widget):
         text += "```\n\n"
 
         self._markdown_source = text
-        self._content.update(RichMarkdown(text))
+        self._content.update(text)
 
     def show_window(self, window: WindowInfo, session: SessionInfo) -> None:
         """Display window details."""
@@ -107,7 +110,7 @@ class DetailPanel(Widget):
             f"- **Active:** {'Yes' if window.is_active else 'No'}\n"
         )
         self._markdown_source = text
-        self._content.update(RichMarkdown(text))
+        self._content.update(text)
 
     def show_session(self, session: SessionInfo) -> None:
         """Display session details."""
@@ -118,9 +121,9 @@ class DetailPanel(Widget):
             f"- **Attached:** {'Yes' if session.is_attached else 'No'}\n"
         )
         self._markdown_source = text
-        self._content.update(RichMarkdown(text))
+        self._content.update(text)
 
     def clear_detail(self) -> None:
         """Clear the detail panel."""
         self._markdown_source = "Select a node to see details"
-        self._content.update(RichMarkdown(self._markdown_source))
+        self._content.update(self._markdown_source)
