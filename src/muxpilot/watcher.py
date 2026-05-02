@@ -54,7 +54,7 @@ class TmuxWatcher:
         capture_lines: int = 30,
         config_path: pathlib.Path | None = None,
         poll_interval: float = DEFAULT_POLL_INTERVAL,
-        preview_lines: int = 5,
+        preview_lines: int = 30,
     ) -> None:
         self.client = client
         self.idle_threshold = idle_threshold
