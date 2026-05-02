@@ -46,15 +46,13 @@ class MuxpilotApp(App[str | None]):
     }
 
     #tree-panel {
-        width: 2fr;
-        min-width: 30;
+        width: 1fr;
         border-right: solid $primary-background-lighten-2;
         padding: 0 1;
     }
 
     #detail-panel {
         width: 1fr;
-        min-width: 25;
     }
 
     TmuxTreeView {
@@ -235,9 +233,9 @@ class MuxpilotApp(App[str | None]):
         # Set initial focus to the tree to avoid the hidden input capturing keys
         self.query_one("#tmux-tree").focus()
 
-        # Apply detail panel width from config
-        detail_panel = self.query_one("#detail-panel", DetailPanel)
-        detail_panel.styles.width = self._label_store_instance.get_detail_panel_width()
+        # Apply tree panel max-width from config
+        tree_panel = self.query_one("#tree-panel", Vertical)
+        tree_panel.styles.max_width = self._label_store_instance.get_tree_panel_max_width()
 
         await self._notify_channel.start()
         self.set_interval(NOTIFY_CHECK_INTERVAL, self._check_notifications)

@@ -36,12 +36,12 @@ class LabelStore:
         self._doc["app"]["theme"] = theme  # type: ignore[index]
         self._save()
 
-    def get_detail_panel_width(self) -> str:
-        """Return the detail panel width or '1fr' default."""
+    def get_tree_panel_max_width(self) -> int:
+        """Return the tree panel max width or 60 default."""
         ui = self._doc.get("ui")
         if ui is None:
-            return "1fr"
-        return ui.get("detail_panel_width", "1fr")  # type: ignore[no-any-return]
+            return 60
+        return ui.get("tree_panel_max_width", 60)  # type: ignore[no-any-return]
 
     def _load(self) -> TOMLDocument:
         if self._path.exists():

@@ -39,10 +39,10 @@ idle_threshold = 10.0
 # ]
 
 [ui]
-# Detail panel width as a CSS fraction unit.
-# Larger values make the detail panel wider relative to the tree panel.
-# Default: "1fr" (tree:detail = 2:1)
-detail_panel_width = "1fr"
+# Tree panel maximum width in characters.
+# The tree panel will not grow wider than this value.
+# Default: 60
+tree_panel_max_width = 60
 
 [notifications]
 # Show toast notifications when tmux polling fails.
