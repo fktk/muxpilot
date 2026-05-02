@@ -97,12 +97,12 @@ class DetailPanel(Widget):
         pane_count = len(window.panes)
         text = (
             f"## Window\n\n"
+            f"- **Session:** {session.session_name}\n"
             f"- **Name:** {window.window_name}\n"
             f"- **Index:** {window.window_index}\n"
             f"- **ID:** {window.window_id}\n"
             f"- **Active:** {'Yes' if window.is_active else 'No'}\n"
-            f"- **Panes:** {pane_count}\n\n"
-            f"- **Session:** {session.session_name}\n"
+            f"- **Panes:** {pane_count}\n"
         )
         self._markdown_source = text
         self._content.update(RichMarkdown(text))

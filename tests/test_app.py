@@ -140,6 +140,31 @@ async def test_detail_panel_pane_shows_session_and_window_before_title():
 
 
 @pytest.mark.asyncio
+async def test_detail_panel_window_shows_session_first():
+    """Window details should show Session before Name."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="my-session", windows=[
+        make_window(window_name="my-window", window_index=3, panes=[
+            make_pane(pane_id="%0")
+        ])
+    ])
+    window = session.windows[0]
+    panel.show_window(window, session)
+    text = panel._markdown_source
+
+    window_section_start = text.find("## Window")
+    session_pos = text.find("- **Session:** my-session")
+    name_pos = text.find("- **Name:** my-window")
+
+    assert window_section_start != -1
+    assert session_pos != -1, "Session info missing"
+    assert name_pos != -1, "Name info missing"
+
+    assert window_section_start < session_pos < name_pos, "Session should appear before Name in Window section"
+
+
+@pytest.mark.asyncio
 async def test_detail_panel_width_default():
     """Detail panel width should default to 1fr when no config is set."""
     from textual.css.scalar import Scalar
