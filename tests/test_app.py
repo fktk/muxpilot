@@ -170,7 +170,7 @@ async def test_detail_panel_width_default():
     from textual.css.scalar import Scalar
     from muxpilot.widgets.detail_panel import DetailPanel
 
-    app = _patched_app()
+    app = _patched_app(config_path=pathlib.Path("/nonexistent-config-for-test"))
     async with app.run_test():
         detail = app.query_one("#detail-panel", DetailPanel)
         assert detail.styles.width == Scalar.parse("1fr")
