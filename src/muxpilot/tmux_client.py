@@ -173,20 +173,17 @@ class TmuxClient:
             return pane.pane_current_command or ""
 
     def capture_pane_content(self, pane_id: str, lines: int = 50) -> list[str]:
-        """Capture the last N lines of output from a pane."""
-        pane = self._find_pane(pane_id)
-        if pane is None:
-            return []
-
+        """Capture the last N lines of output from a pane via subprocess."""
         try:
-            start_line = -lines
-            content = pane.capture_pane(start=start_line)
-            if isinstance(content, str):
-                return content.splitlines()
-            if isinstance(content, list):
-                return content
-            return []
-        except libtmux.exc.LibTmuxException:
+            result = subprocess.run(
+                ["tmux", "capture-pane", "-p", "-t", pane_id, "-S", f"-{lines}"],
+                capture_output=True,
+                text=True,
+                timeout=5.0,
+            )
+            result.check_returncode()
+            return result.stdout.splitlines()
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return []
 
     def _get_git_info(self, path: str) -> dict[str, str]:
