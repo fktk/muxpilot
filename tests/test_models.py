@@ -152,6 +152,18 @@ class TestPaneInfoDisplayLabel:
         assert "python" in pane.display_label
         assert "user/proj" in pane.display_label
 
+    def test_get_display_label_with_icon_override(self) -> None:
+        """icon_override should replace the default status icon."""
+        pane = make_pane(
+            status=PaneStatus.ACTIVE,
+            current_command="vim",
+            current_path="/tmp/work",
+        )
+        label = pane.get_display_label(icon_override="[bold cyan]X[/bold cyan]")
+        assert label.startswith("[bold cyan]X[/bold cyan]")
+        assert "vim" in label
+        assert "work" in label
+
 
 # ============================================================================
 # WindowInfo.display_label

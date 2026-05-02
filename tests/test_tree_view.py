@@ -59,3 +59,22 @@ def test_error_pane_icon_is_red():
         f"ERROR pane icon should be red, got spans: {label.spans}"
 
 
+def test_active_pane_label_animated():
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", status=PaneStatus.ACTIVE, is_active=True),
+        ])])
+    ])
+    tw = TmuxTreeView()
+    tw.populate(tree)
+    pane_node = tw.root.children[0].children[0].children[0]
+    initial_label = pane_node.label
+
+    tw._animation_frame = 0
+    tw._animate_active_icons()
+
+    assert tw._animation_frame == 1
+    new_label = pane_node.label
+    assert initial_label != new_label
+
+
