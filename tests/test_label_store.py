@@ -81,6 +81,20 @@ error_patterns = [
         assert data["app"]["theme"] == "textual-light"
 
 
+class TestLabelStoreTreePanelMaxWidth:
+    """Tree panel max-width get operations."""
+
+    def test_get_tree_panel_max_width_default(self, tmp_path: Path) -> None:
+        store = LabelStore(config_path=tmp_path / "config.toml")
+        assert store.get_tree_panel_max_width() == 60
+
+    def test_get_tree_panel_max_width_from_config(self, tmp_path: Path) -> None:
+        config_path = tmp_path / "config.toml"
+        config_path.write_text('[ui]\ntree_panel_max_width = 80\n')
+        store = LabelStore(config_path=config_path)
+        assert store.get_tree_panel_max_width() == 80
+
+
 class TestLabelStoreEdgeCases:
     """Edge case handling."""
 
