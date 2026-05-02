@@ -54,6 +54,8 @@ class DetailPanel(Widget):
     def show_pane(self, pane: PaneInfo, window: WindowInfo, session: SessionInfo) -> None:
         """Display pane details."""
         icon = STATUS_ICONS.get(pane.status, "?")
+        # Convert Rich console markup to Markdown bold for the detail panel
+        markdown_icon = icon.replace("[bold]", "**").replace("[/bold]", "**")
         status_name = pane.status.value if pane.status else "unknown"
         idle_text = f" ({pane.idle_seconds:.1f}s idle)" if pane.idle_seconds > 0 else ""
         title = pane.pane_title or "—"
@@ -67,9 +69,7 @@ class DetailPanel(Widget):
             f"- **Branch:** {branch}\n"
             f"- **Command:** `{pane.full_command or pane.current_command}`\n"
             f"- **Path:** {_shorten_path(pane.current_path)}\n"
-            f"- **Size:** {pane.width}×{pane.height}\n"
-            f"- **Active:** {'Yes' if pane.is_active else 'No'}\n"
-            f"- **Status:** {icon} {status_name}{idle_text}\n"
+            f"- **Status:** {markdown_icon} {status_name}{idle_text}\n"
         )
 
         if pane.status == PaneStatus.ERROR:
