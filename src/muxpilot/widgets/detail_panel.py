@@ -55,7 +55,12 @@ class DetailPanel(Widget):
         """Display pane details."""
         icon = STATUS_ICONS.get(pane.status, "?")
         # Convert Rich console markup to Markdown bold for the detail panel
-        markdown_icon = icon.replace("[bold]", "**").replace("[/bold]", "**")
+        markdown_icon = (
+            icon.replace("[bold red]", "**")
+            .replace("[/bold red]", "**")
+            .replace("[bold]", "**")
+            .replace("[/bold]", "**")
+        )
         status_name = pane.status.value if pane.status else "unknown"
         idle_text = f" ({pane.idle_seconds:.1f}s idle)" if pane.idle_seconds > 0 else ""
         title = pane.pane_title or "—"

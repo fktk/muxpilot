@@ -98,6 +98,28 @@ async def test_detail_panel_shows_pane_title_and_git():
     assert "line2" in text
 
 
+def test_detail_panel_error_status_shows_clean_icon():
+    """Detail panel should render ERROR status icon cleanly without broken markup."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="dev", windows=[
+        make_window(window_name="editor", panes=[
+            make_pane(pane_id="%0", status=PaneStatus.ERROR)
+        ])
+    ])
+    window = session.windows[0]
+    pane = window.panes[0]
+    panel.show_pane(pane, window, session)
+    text = panel._markdown_source
+
+    # Should NOT contain broken/unclosed markup fragments
+    assert "[bold" not in text, f"Broken bold markup found: {text}"
+    assert "red]" not in text, f"Broken red markup found: {text}"
+    # Should show the bold letter E in Markdown
+    assert "**E**" in text, f"Bold E not found in status line: {text}"
+    assert "error" in text
+
+
 @pytest.mark.asyncio
 async def test_detail_panel_pane_shows_session_and_window_before_title():
     """Pane details should show Session and Window before Title, and not repeat them after Recent Output."""
