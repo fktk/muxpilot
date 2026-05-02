@@ -297,8 +297,6 @@ class MuxpilotApp(App[str | None]):
 
         for event in events:
             status_bar.show_event(event)
-            if event.event_type not in ("status_changed", "focus_changed"):
-                self._notify_channel.send(event.message)
 
     def on_tmux_tree_view_node_info(self, message: TmuxTreeView.NodeInfo) -> None:
         """Handle node highlight → update detail panel."""
@@ -316,16 +314,14 @@ class MuxpilotApp(App[str | None]):
 
         # Don't navigate to our own pane
         if pane_id == self._current_pane_id:
-            self._notify_channel.send("This is the current pane")
             return
 
         success = self._client.navigate_to(pane_id)
         if success:
-            self._notify_channel.send(f"Navigated to {pane_id}")
             self._polling.trigger_cooldown()
             await self._do_refresh()
         else:
-            self._notify_channel.send(f"Failed to navigate to {pane_id}")
+            pass
 
     def action_help(self) -> None:
         """Show help (? key)."""
@@ -367,7 +363,6 @@ class MuxpilotApp(App[str | None]):
         filter_input = self.query_one("#filter-input", Input)
         filter_input.value = ""
         filter_input.remove_class("-active")
-        self._notify_channel.send("All filters cleared")
         await self._do_refresh()
 
     async def action_rename(self) -> None:
@@ -413,7 +408,6 @@ class MuxpilotApp(App[str | None]):
 
         # Don't kill our own pane
         if pane.pane_id == self._current_pane_id:
-            self._notify_channel.send("Cannot kill the current pane")
             return
 
         label = pane.custom_label or pane.pane_id
@@ -421,8 +415,6 @@ class MuxpilotApp(App[str | None]):
         def on_result(confirmed: bool | None) -> None:
             if confirmed:
                 success = self._client.kill_pane(pane.pane_id)
-                msg = f"Killed pane {label}" if success else f"Failed to kill pane {label}"
-                self._notify_channel.send(msg)
                 self._polling.trigger_cooldown()
                 asyncio.create_task(self._do_refresh())
 

@@ -492,8 +492,8 @@ async def test_status_changed_events_not_notified():
 
 
 @pytest.mark.asyncio
-async def test_structural_events_still_notified():
-    """Structural events (pane_added, etc.) should still be sent to NotifyChannel."""
+async def test_structural_events_not_notified():
+    """Structural events (pane_added, etc.) should NOT be sent to NotifyChannel."""
     from muxpilot.models import TmuxEvent
 
     tree = make_tree(sessions=[
@@ -512,9 +512,9 @@ async def test_structural_events_still_notified():
         with patch.object(app._watcher, "poll", return_value=(tree, [structural_event])):
             await app._poll_tmux()
 
-        # Verify the structural event WAS notified
+        # Verify the structural event was NOT notified
         messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
-        assert "Pane added: %1" in messages
+        assert "Pane added: %1" not in messages
 
 
 # ============================================================================
