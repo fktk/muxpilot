@@ -180,7 +180,7 @@ class TmuxClient:
 
         try:
             start_line = -lines
-            content = pane.capture_pane(start=start_line, end=-1)
+            content = pane.capture_pane(start=start_line)
             if isinstance(content, str):
                 return content.splitlines()
             if isinstance(content, list):
