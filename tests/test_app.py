@@ -186,30 +186,30 @@ async def test_detail_panel_window_shows_session_first():
 
 
 @pytest.mark.asyncio
-async def test_detail_panel_width_default():
-    """Detail panel width should default to 1fr when no config is set."""
+async def test_tree_panel_max_width_default():
+    """Tree panel max-width should default to 60 when no config is set."""
+    from textual.containers import Vertical
     from textual.css.scalar import Scalar
-    from muxpilot.widgets.detail_panel import DetailPanel
 
     app = _patched_app(config_path=pathlib.Path("/nonexistent-config-for-test"))
     async with app.run_test():
-        detail = app.query_one("#detail-panel", DetailPanel)
-        assert detail.styles.width == Scalar.parse("1fr")
+        tree_panel = app.query_one("#tree-panel", Vertical)
+        assert tree_panel.styles.max_width == Scalar.parse("60")
 
 
 @pytest.mark.asyncio
-async def test_detail_panel_width_from_config(tmp_path):
-    """Detail panel width should be read from config.toml."""
+async def test_tree_panel_max_width_from_config(tmp_path):
+    """Tree panel max-width should be read from config.toml."""
+    from textual.containers import Vertical
     from textual.css.scalar import Scalar
-    from muxpilot.widgets.detail_panel import DetailPanel
 
     config_path = tmp_path / "config.toml"
-    config_path.write_text('[ui]\ndetail_panel_width = "3fr"\n')
+    config_path.write_text('[ui]\ntree_panel_max_width = 80\n')
 
     app = _patched_app(config_path=config_path)
     async with app.run_test():
-        detail = app.query_one("#detail-panel", DetailPanel)
-        assert detail.styles.width == Scalar.parse("3fr")
+        tree_panel = app.query_one("#tree-panel", Vertical)
+        assert tree_panel.styles.max_width == Scalar.parse("80")
 
 
 @pytest.mark.asyncio
