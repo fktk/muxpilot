@@ -85,8 +85,7 @@ class DetailPanel(Widget):
         )
         preview = pane.recent_lines if pane.recent_lines else ["(no output)"]
         for line in preview:
-            safe = line if line.strip() else "(blank)"
-            text += f"{safe}\n"
+            text += f"{line}\n"
         text += "```\n\n"
 
         self._markdown_source = text
