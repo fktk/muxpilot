@@ -35,15 +35,10 @@ class StatusBar(Static):
     @staticmethod
     def _icon_legend() -> str:
         """Build the icon→status legend string."""
-        parts = []
-        for s in PaneStatus:
-            icon = STATUS_ICONS[s]
-            label = StatusBar._STATUS_LABELS[s]
-            if s == PaneStatus.ERROR:
-                parts.append(f"[red]{icon}:{label}[/red]")
-            else:
-                parts.append(f"{icon}:{label}")
-        return "  ".join(parts)
+        return "  ".join(
+            f"{STATUS_ICONS[s]}:{StatusBar._STATUS_LABELS[s]}"
+            for s in PaneStatus
+        )
 
     def update_stats(self, tree: TmuxTree) -> None:
         """Update the status bar with tree statistics."""
@@ -64,7 +59,7 @@ class StatusBar(Static):
             if count > 0:
                 icon = STATUS_ICONS[status]
                 if status == PaneStatus.ERROR:
-                    parts.append(f"[red]{icon} {count}[/red]")
+                    parts.append(f"{icon} [red]{count}[/red]")
                 else:
                     parts.append(f"{icon} {count}")
 

@@ -499,7 +499,9 @@ async def test_status_bar_shows_icon_legend():
 
         # Each status icon (rendered as plain bold letter) and its label should appear
         for status, icon in STATUS_ICONS.items():
-            plain_icon = icon.replace("[bold]", "").replace("[/bold]", "")
+            # Strip all markup tags to get the plain letter
+            import re
+            plain_icon = re.sub(r"\[.*?\]", "", icon)
             assert plain_icon in text, f"Icon {plain_icon!r} for {status.value} not found in status bar"
             assert status.value in text, f"Label {status.value!r} not found in status bar"
 
@@ -509,9 +511,9 @@ def test_status_bar_error_legend_is_red():
     from muxpilot.widgets.status_bar import StatusBar
 
     legend = StatusBar._icon_legend()
-    assert "[red]" in legend, "ERROR legend should be wrapped in [red] markup"
-    assert "[/red]" in legend, "ERROR legend should close [red] markup"
-    assert "[red][bold]E[/bold]:error[/red]" in legend, "ERROR legend should contain red-wrapped E:error"
+    assert "[bold red]" in legend, "ERROR legend should contain bold red markup"
+    assert "[/bold red]" in legend, "ERROR legend should close bold red markup"
+    assert "[bold red]E[/bold red]:error" in legend, "ERROR legend should contain red-wrapped E:error"
 
 
 def test_status_bar_error_count_is_red():

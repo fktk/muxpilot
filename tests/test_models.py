@@ -30,7 +30,7 @@ def test_status_icons_use_bold_letters():
     expected = {
         PaneStatus.ACTIVE: "[bold]A[/bold]",
         PaneStatus.WAITING_INPUT: "[bold]W[/bold]",
-        PaneStatus.ERROR: "[bold]E[/bold]",
+        PaneStatus.ERROR: "[bold red]E[/bold red]",
         PaneStatus.IDLE: "[bold]I[/bold]",
     }
     assert STATUS_ICONS == expected

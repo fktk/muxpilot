@@ -1,5 +1,6 @@
 import pytest
 
+from muxpilot.models import PaneStatus
 from muxpilot.widgets.tree_view import TmuxTreeView
 from conftest import make_tree, make_session, make_window, make_pane
 
@@ -41,5 +42,20 @@ def test_self_pane_hidden():
     tw = TmuxTreeView()
     tw.populate(tree, current_pane_id="%1")
     assert "%1" not in tw._pane_map
+
+
+def test_error_pane_icon_is_red():
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", status=PaneStatus.ERROR),
+        ])])
+    ])
+    tw = TmuxTreeView()
+    tw.populate(tree)
+    pane_node = tw.root.children[0].children[0].children[0]
+    label = pane_node.label
+    # The label should contain a red-styled span
+    assert any("red" in (span.style or "") for span in label.spans), \
+        f"ERROR pane icon should be red, got spans: {label.spans}"
 
 

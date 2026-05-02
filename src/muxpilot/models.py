@@ -19,7 +19,7 @@ class PaneStatus(Enum):
 STATUS_ICONS: dict[PaneStatus, str] = {
     PaneStatus.ACTIVE: "[bold]A[/bold]",
     PaneStatus.WAITING_INPUT: "[bold]W[/bold]",
-    PaneStatus.ERROR: "[bold]E[/bold]",
+    PaneStatus.ERROR: "[bold red]E[/bold red]",
     PaneStatus.IDLE: "[bold]I[/bold]",
 }
 
