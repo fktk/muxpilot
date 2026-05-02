@@ -98,7 +98,6 @@ class DetailPanel(Widget):
 
     def show_window(self, window: WindowInfo, session: SessionInfo) -> None:
         """Display window details."""
-        pane_count = len(window.panes)
         text = (
             f"## Window\n\n"
             f"- **Session:** {session.session_name}\n"
@@ -106,22 +105,17 @@ class DetailPanel(Widget):
             f"- **Index:** {window.window_index}\n"
             f"- **ID:** {window.window_id}\n"
             f"- **Active:** {'Yes' if window.is_active else 'No'}\n"
-            f"- **Panes:** {pane_count}\n"
         )
         self._markdown_source = text
         self._content.update(RichMarkdown(text))
 
     def show_session(self, session: SessionInfo) -> None:
         """Display session details."""
-        window_count = len(session.windows)
-        pane_count = sum(len(w.panes) for w in session.windows)
         text = (
             f"## Session\n\n"
             f"- **Name:** {session.session_name}\n"
             f"- **ID:** {session.session_id}\n"
             f"- **Attached:** {'Yes' if session.is_attached else 'No'}\n"
-            f"- **Windows:** {window_count}\n"
-            f"- **Panes:** {pane_count}\n"
         )
         self._markdown_source = text
         self._content.update(RichMarkdown(text))

@@ -186,6 +186,38 @@ async def test_detail_panel_window_shows_session_first():
 
 
 @pytest.mark.asyncio
+async def test_detail_panel_window_does_not_show_pane_count():
+    """Window details should not include pane count."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="my-session", windows=[
+        make_window(window_name="my-window", window_index=3, panes=[
+            make_pane(pane_id="%0"),
+            make_pane(pane_id="%1"),
+        ])
+    ])
+    window = session.windows[0]
+    panel.show_window(window, session)
+    text = panel._markdown_source
+    assert "**Panes:**" not in text
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_session_does_not_show_counts():
+    """Session details should not include window or pane counts."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="my-session", windows=[
+        make_window(window_name="w1", window_index=0, panes=[make_pane(pane_id="%0")]),
+        make_window(window_name="w2", window_index=1, panes=[make_pane(pane_id="%1"), make_pane(pane_id="%2")]),
+    ])
+    panel.show_session(session)
+    text = panel._markdown_source
+    assert "**Windows:**" not in text
+    assert "**Panes:**" not in text
+
+
+@pytest.mark.asyncio
 async def test_detail_panel_width_default():
     """Detail panel width should default to 1fr when no config is set."""
     from textual.css.scalar import Scalar
