@@ -19,10 +19,10 @@ from muxpilot.widgets.tree_view import TmuxTreeView
 from conftest import make_mock_client, make_mock_notify_channel, make_pane, make_session, make_tree, make_window
 
 
-def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error=None):
+def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error=None, config_path=None):
     """Create a MuxpilotApp with a mocked TmuxClient/Watcher."""
     mock_client = make_mock_client(tree=tree, current_pane_id=current_pane_id)
-    app = MuxpilotApp()
+    app = MuxpilotApp(config_path=config_path)
     app._client = mock_client
     from muxpilot.controllers import RenameController
     app._rename_controller = RenameController(mock_client)
@@ -96,6 +96,33 @@ async def test_detail_panel_shows_pane_title_and_git():
     assert "12.0s idle" in text
     assert "line1" in text
     assert "line2" in text
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_width_default():
+    """Detail panel width should default to 1fr when no config is set."""
+    from textual.css.scalar import Scalar
+    from muxpilot.widgets.detail_panel import DetailPanel
+
+    app = _patched_app()
+    async with app.run_test():
+        detail = app.query_one("#detail-panel", DetailPanel)
+        assert detail.styles.width == Scalar.parse("1fr")
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_width_from_config(tmp_path):
+    """Detail panel width should be read from config.toml."""
+    from textual.css.scalar import Scalar
+    from muxpilot.widgets.detail_panel import DetailPanel
+
+    config_path = tmp_path / "config.toml"
+    config_path.write_text('[ui]\ndetail_panel_width = "3fr"\n')
+
+    app = _patched_app(config_path=config_path)
+    async with app.run_test():
+        detail = app.query_one("#detail-panel", DetailPanel)
+        assert detail.styles.width == Scalar.parse("3fr")
 
 
 @pytest.mark.asyncio

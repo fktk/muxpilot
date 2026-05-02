@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import pathlib
 import subprocess
 import sys
 
@@ -99,14 +100,14 @@ class MuxpilotApp(App[str | None]):
         Binding("x", "kill_pane", "Kill pane"),
     ]
 
-    def __init__(self) -> None:
+    def __init__(self, config_path: pathlib.Path | None = None) -> None:
         super().__init__()
         self._client = TmuxClient()
         self._watcher_instance = TmuxWatcher(self._client)
         self._current_pane_id: str | None = None
         self._navigate_to: str | None = None
         self._notify_channel_instance = NotifyChannel()
-        self._label_store_instance = LabelStore()
+        self._label_store_instance = LabelStore(config_path=config_path)
         self._notify_config_error()
 
         self._filter_state = FilterState()
@@ -235,6 +236,10 @@ class MuxpilotApp(App[str | None]):
 
         # Set initial focus to the tree to avoid the hidden input capturing keys
         self.query_one("#tmux-tree").focus()
+
+        # Apply detail panel width from config
+        detail_panel = self.query_one("#detail-panel", DetailPanel)
+        detail_panel.styles.width = self._label_store_instance.get_detail_panel_width()
 
         await self._notify_channel.start()
         self.set_interval(NOTIFY_CHECK_INTERVAL, self._check_notifications)
