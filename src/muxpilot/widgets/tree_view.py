@@ -9,7 +9,12 @@ from textual.message import Message
 from textual.widgets import Tree
 from textual.widgets._tree import TreeNode
 
-from muxpilot.models import PaneInfo, PaneStatus, SessionInfo, TmuxTree, WindowInfo
+from muxpilot.models import PaneInfo, PaneStatus, SessionInfo, STATUS_ICONS, TmuxTree, WindowInfo
+
+# Pastel colors for the ACTIVE icon animation (no red)
+_ANIMATION_COLORS = [
+    "#FFD4A3", "#FFFFB3", "#B3FFB3", "#B3D9FF", "#D9B3FF",
+]
 
 
 class TmuxTreeView(Tree[Text]):
@@ -50,6 +55,11 @@ class TmuxTreeView(Tree[Text]):
         self._expanded_paths: set[str] = set()
         self._selected_path: str | None = None
         self._has_populated: bool = False
+        self._animation_frame: int = 0
+
+    def on_mount(self) -> None:
+        """Start the ACTIVE icon animation interval."""
+        self.set_interval(0.3, self._animate_active_icons)
 
     def get_cursor_node_data(self) -> tuple[str, SessionInfo | None, WindowInfo | None, PaneInfo | None] | None:
         """Return the data tuple for the currently cursor-selected node, or None."""
@@ -195,11 +205,7 @@ class TmuxTreeView(Tree[Text]):
                     self._node_data[window_node.id] = ("window", session, window, None)
 
                     for pane in panes:
-                        label_text = Text.from_markup(pane.display_label)
-                        if pane.is_active:
-                            label_text.stylize("bold")
-                        else:
-                            label_text.stylize("dim")
+                        label_text = self._build_pane_label(pane)
 
                         pane_node = window_node.add_leaf(label_text)
                         self._node_data[pane_node.id] = ("pane", session, window, pane)
@@ -212,6 +218,41 @@ class TmuxTreeView(Tree[Text]):
             self._restore_state()
 
         self._has_populated = True
+
+    def _animate_active_icons(self) -> None:
+        """Cycle the color of ACTIVE pane icons."""
+        self._animation_frame += 1
+        color = _ANIMATION_COLORS[self._animation_frame % len(_ANIMATION_COLORS)]
+        animated_icon = f"[{color}]A[/{color}]"
+
+        for node_id, data in self._node_data.items():
+            node_type, session, window, pane = data
+            if node_type != "pane" or pane is None or pane.status != PaneStatus.ACTIVE:
+                continue
+            # Find the node by traversing — node_id is the TreeNode.id
+            for node in self._walk_nodes():
+                if node.id == node_id:
+                    label = self._build_pane_label(pane, animated_icon)
+                    node.set_label(label)
+                    break
+
+    def _walk_nodes(self):
+        """Yield all nodes in the tree (breadth-first)."""
+        queue = [self.root]
+        while queue:
+            node = queue.pop(0)
+            yield node
+            queue.extend(node.children)
+
+    def _build_pane_label(self, pane: PaneInfo, icon: str | None = None) -> Text:
+        """Build a Rich Text label for a pane, optionally overriding the icon."""
+        markup = pane.get_display_label(icon_override=icon)
+        label_text = Text.from_markup(markup)
+        if pane.is_active:
+            label_text.stylize("bold")
+        else:
+            label_text.stylize("dim")
+        return label_text
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted[Text]) -> None:
         """When a node is highlighted, emit NodeInfo for the detail panel."""

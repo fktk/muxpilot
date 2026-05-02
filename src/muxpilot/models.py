@@ -45,10 +45,13 @@ class PaneInfo:
     idle_seconds: float = 0.0
     recent_lines: list[str] = field(default_factory=list)
 
-    @property
-    def display_label(self) -> str:
-        """Label for tree view display."""
-        icon = STATUS_ICONS.get(self.status, "?")
+    def get_display_label(self, icon_override: str | None = None) -> str:
+        """Label for tree view display.
+
+        Args:
+            icon_override: If given, replaces the default status icon markup.
+        """
+        icon = icon_override if icon_override is not None else STATUS_ICONS.get(self.status, "?")
         if self.pane_title:
             return f"{icon} {self.pane_title}"
         if self.custom_label:
@@ -71,6 +74,11 @@ class PaneInfo:
             cmd = self.current_command or self.full_command
 
         return f"{icon} {cmd} — {short_path}"
+
+    @property
+    def display_label(self) -> str:
+        """Label for tree view display."""
+        return self.get_display_label()
 
 
 @dataclass
