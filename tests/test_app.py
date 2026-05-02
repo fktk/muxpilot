@@ -99,6 +99,47 @@ async def test_detail_panel_shows_pane_title_and_git():
 
 
 @pytest.mark.asyncio
+async def test_detail_panel_pane_shows_session_and_window_before_title():
+    """Pane details should show Session and Window before Title, and not repeat them after Recent Output."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="my-session", windows=[
+        make_window(window_name="my-window", window_index=3, panes=[
+            make_pane(pane_id="%0", pane_title="agent-a", recent_lines=["line1"])
+        ])
+    ])
+    window = session.windows[0]
+    pane = window.panes[0]
+    panel.show_pane(pane, window, session)
+    text = panel._markdown_source
+
+    pane_section_start = text.find("## Pane")
+    recent_output_start = text.find("## Recent Output")
+    assert pane_section_start != -1
+    assert recent_output_start != -1
+    assert pane_section_start < recent_output_start
+
+    session_pos = text.find("- **Session:** my-session")
+    window_pos = text.find("- **Window:** my-window (#3)")
+    title_pos = text.find("- **Title:** agent-a")
+
+    assert session_pos != -1, "Session info missing"
+    assert window_pos != -1, "Window info missing"
+    assert title_pos != -1, "Title info missing"
+
+    assert pane_section_start < session_pos < recent_output_start, "Session should be inside Pane section"
+    assert pane_section_start < window_pos < recent_output_start, "Window should be inside Pane section"
+    assert pane_section_start < title_pos < recent_output_start, "Title should be inside Pane section"
+
+    assert session_pos < window_pos < title_pos, "Order should be Session -> Window -> Title"
+
+    # Ensure Session/Window do not appear after Recent Output
+    after_recent = text[recent_output_start:]
+    assert "**Session:**" not in after_recent, "Session should not repeat after Recent Output"
+    assert "**Window:**" not in after_recent, "Window should not repeat after Recent Output"
+
+
+@pytest.mark.asyncio
 async def test_detail_panel_width_default():
     """Detail panel width should default to 1fr when no config is set."""
     from textual.css.scalar import Scalar

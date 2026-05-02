@@ -64,6 +64,8 @@ class DetailPanel(Widget):
 
         text = (
             f"## Pane\n\n"
+            f"- **Session:** {session.session_name}\n"
+            f"- **Window:** {window.window_name} (#{window.window_index})\n"
             f"- **Title:** {title}\n"
             f"- **Repository:** {repo}\n"
             f"- **Branch:** {branch}\n"
@@ -87,10 +89,6 @@ class DetailPanel(Widget):
             text += f"{safe}\n"
         text += "```\n\n"
 
-        text += (
-            f"- **Window:** {window.window_name} (#{window.window_index})\n"
-            f"- **Session:** {session.session_name}\n"
-        )
         self._markdown_source = text
         self._content.update(RichMarkdown(text))
 
