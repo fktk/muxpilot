@@ -504,6 +504,35 @@ async def test_status_bar_shows_icon_legend():
             assert status.value in text, f"Label {status.value!r} not found in status bar"
 
 
+def test_status_bar_error_legend_is_red():
+    """StatusBar legend entry for ERROR should be wrapped in [red] markup."""
+    from muxpilot.widgets.status_bar import StatusBar
+
+    legend = StatusBar._icon_legend()
+    assert "[red]" in legend, "ERROR legend should be wrapped in [red] markup"
+    assert "[/red]" in legend, "ERROR legend should close [red] markup"
+    assert "[red][bold]E[/bold]:error[/red]" in legend, "ERROR legend should contain red-wrapped E:error"
+
+
+def test_status_bar_error_count_is_red():
+    """StatusBar count for ERROR panes should be rendered with red style."""
+    from muxpilot.widgets.status_bar import StatusBar
+
+    sb = StatusBar()
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", status=PaneStatus.ERROR),
+            make_pane(pane_id="%1", status=PaneStatus.ERROR),
+        ])])
+    ])
+    sb.update_stats(tree)
+
+    content = sb.render()
+    # Check that a red span exists covering the error count text
+    red_spans = [span for span in content.spans if str(span.style) == "red"]
+    assert len(red_spans) > 0, "ERROR count should have a red span"
+
+
 def _all_nodes(tw: TmuxTreeView):
     """Collect all tree nodes via BFS."""
     nodes = []
