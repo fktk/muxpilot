@@ -23,7 +23,6 @@ from muxpilot.tmux_client import TmuxClient
 from muxpilot.watcher import TmuxWatcher
 from muxpilot.widgets.detail_panel import DetailPanel
 from muxpilot.widgets.filter_bar import FilterBar
-from muxpilot.widgets.status_bar import StatusBar
 from muxpilot.widgets.tree_view import TmuxTreeView
 
 
@@ -219,7 +218,6 @@ class MuxpilotApp(App[str | None]):
                 yield FilterBar(id="filter-bar")
                 yield TmuxTreeView(id="tmux-tree")
             yield DetailPanel(id="detail-panel")
-        yield StatusBar(id="status-bar")
         yield Footer()
 
     async def on_mount(self) -> None:
@@ -291,12 +289,6 @@ class MuxpilotApp(App[str | None]):
 
             filter_bar = self.query_one("#filter-bar", FilterBar)
             filter_bar.update(self._status_filter, self._name_filter)
-
-        status_bar = self.query_one("#status-bar", StatusBar)
-        status_bar.update_stats(tree)
-
-        for event in events:
-            status_bar.show_event(event)
 
     def on_tmux_tree_view_node_info(self, message: TmuxTreeView.NodeInfo) -> None:
         """Handle node highlight → update detail panel."""

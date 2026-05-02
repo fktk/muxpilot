@@ -10,6 +10,9 @@ theme = "textual-dark"
 # Polling interval in seconds
 poll_interval = 2.0
 
+# Idle threshold in seconds before a pane is considered idle
+idle_threshold = 10.0
+
 # Prompt patterns (regular expressions)
 # Specifying these completely REPLACES the default patterns.
 # Uncomment and customize as needed.
