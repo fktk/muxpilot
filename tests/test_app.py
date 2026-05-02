@@ -953,6 +953,54 @@ async def test_detail_panel_updates_on_refresh_without_cursor_change():
         assert "user@host:~$" not in detail._markdown_source
 
 
+@pytest.mark.asyncio
+async def test_detail_panel_updates_on_poll_without_events():
+    """Periodic poll without status events must still refresh DetailPanel."""
+    from unittest.mock import patch
+    from muxpilot.widgets.detail_panel import DetailPanel
+
+    tree = make_tree(sessions=[
+        make_session(session_name="dev", windows=[
+            make_window(window_name="editor", panes=[
+                make_pane(pane_id="%0", is_active=False, status=PaneStatus.ACTIVE)
+            ])
+        ])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        detail = app.query_one("#detail-panel", DetailPanel)
+        assert "user@host:~$" in detail._markdown_source
+
+        # Build a new tree with updated recent_lines but no events
+        updated_tree = make_tree(sessions=[
+            make_session(session_name="dev", windows=[
+                make_window(window_name="editor", panes=[
+                    make_pane(
+                        pane_id="%0",
+                        is_active=False,
+                        status=PaneStatus.ACTIVE,
+                        recent_lines=["polled output"],
+                    )
+                ])
+            ])
+        ])
+        # Patch watcher.poll to return updated tree with no events
+        with patch.object(app._watcher, "poll", return_value=(updated_tree, [])):
+            await app._poll_tmux()
+            await pilot.pause()
+            await pilot.pause()
+
+        assert "polled output" in detail._markdown_source
+        assert "user@host:~$" not in detail._markdown_source
+
+
 # ============================================================================
 # Polling: error handling and backoff
 # ============================================================================

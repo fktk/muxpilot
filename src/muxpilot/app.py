@@ -264,7 +264,7 @@ class MuxpilotApp(App[str | None]):
         if result is None:
             return
         tree, events = result
-        await self._update_ui_from_poll(tree, events, rebuild_tree=bool(events))
+        await self._update_ui_from_poll(tree, events, rebuild_tree=True)
 
     async def _update_ui_from_poll(
         self,
