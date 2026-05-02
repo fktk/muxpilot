@@ -113,7 +113,22 @@ class TmuxTreeView(Tree[Text]):
             # Defer until after rendering: newly added nodes have _line == -1
             # until the tree renders, so move_cursor() would snap to line -1
             # (top) if called synchronously here.
-            self.call_after_refresh(self.move_cursor, target_cursor_node)
+            self.call_after_refresh(self._move_cursor_and_emit, target_cursor_node)
+
+    def _move_cursor_and_emit(self, node: TreeNode[Text]) -> None:
+        """Move cursor to node and emit NodeInfo for the detail panel."""
+        self.move_cursor(node)
+        data = self._node_data.get(node.id)
+        if data:
+            node_type, session, window, pane = data
+            self.post_message(
+                self.NodeInfo(
+                    node_type=node_type,
+                    session_info=session,
+                    window_info=window,
+                    pane_info=pane,
+                )
+            )
 
     def populate(
         self,

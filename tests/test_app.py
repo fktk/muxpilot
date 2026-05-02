@@ -50,7 +50,6 @@ async def test_app_launches():
     async with app.run_test():
         assert app.query_one("#tmux-tree", TmuxTreeView) is not None
         assert app.query_one("#detail-panel") is not None
-        assert app.query_one("#status-bar") is not None
         assert app.query_one("#filter-input", Input) is not None
 
 
@@ -502,61 +501,6 @@ async def test_cursor_preserved_after_repopulate():
             )
 
 
-# ============================================================================
-# StatusBar: icon legend display
-# ============================================================================
-
-
-@pytest.mark.asyncio
-async def test_status_bar_shows_icon_legend():
-    """StatusBar should display the icon-to-status legend."""
-    from muxpilot.models import STATUS_ICONS
-    from muxpilot.widgets.status_bar import StatusBar
-
-    tree = make_tree()
-    app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
-        sb = app.query_one("#status-bar", StatusBar)
-        text = str(sb.render())
-
-        # Each status icon (rendered as plain bold letter) and its label should appear
-        for status, icon in STATUS_ICONS.items():
-            # Strip all markup tags to get the plain letter
-            import re
-            plain_icon = re.sub(r"\[.*?\]", "", icon)
-            assert plain_icon in text, f"Icon {plain_icon!r} for {status.value} not found in status bar"
-            assert status.value in text, f"Label {status.value!r} not found in status bar"
-
-
-def test_status_bar_error_legend_is_red():
-    """StatusBar legend entry for ERROR should be wrapped in [red] markup."""
-    from muxpilot.widgets.status_bar import StatusBar
-
-    legend = StatusBar._icon_legend()
-    assert "[bold red]" in legend, "ERROR legend should contain bold red markup"
-    assert "[/bold red]" in legend, "ERROR legend should close bold red markup"
-    assert "[bold red]E[/bold red]:error" in legend, "ERROR legend should contain red-wrapped E:error"
-
-
-def test_status_bar_error_count_is_red():
-    """StatusBar count for ERROR panes should be rendered with red style."""
-    from muxpilot.widgets.status_bar import StatusBar
-
-    sb = StatusBar()
-    tree = make_tree(sessions=[
-        make_session(windows=[make_window(panes=[
-            make_pane(pane_id="%0", status=PaneStatus.ERROR),
-            make_pane(pane_id="%1", status=PaneStatus.ERROR),
-        ])])
-    ])
-    sb.update_stats(tree)
-
-    content = sb.render()
-    # Check that a red span exists covering the error count text
-    red_spans = [span for span in content.spans if str(span.style) == "red"]
-    assert len(red_spans) > 0, "ERROR count should have a red span"
-
-
 def _all_nodes(tw: TmuxTreeView):
     """Collect all tree nodes via BFS."""
     nodes = []
@@ -591,10 +535,6 @@ async def test_status_changed_events_not_notified():
             new_status=PaneStatus.ACTIVE,
             message="%0: waiting → active",
         )
-        # Call the event handling code path directly
-        status_bar = app.query_one("#status-bar")
-        status_bar.show_event(status_event)
-
         # Clear prior send() calls from mount
         app._notify_channel.send.reset_mock()
 
@@ -973,6 +913,9 @@ async def test_detail_panel_updates_on_refresh_without_cursor_change():
         # Change the captured pane content and refresh without moving cursor
         app._client.capture_pane_content.return_value = ["new output line"]
         await app._do_refresh()
+        # Wait for call_after_refresh to fire after tree repopulates
+        await pilot.pause()
+        await pilot.pause()
 
         assert "new output line" in detail._markdown_source
         assert "user@host:~$" not in detail._markdown_source

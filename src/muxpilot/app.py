@@ -298,15 +298,6 @@ class MuxpilotApp(App[str | None]):
         for event in events:
             status_bar.show_event(event)
 
-        # Refresh detail panel using the latest data for the currently selected
-        # node, since repopulating the tree does not emit NodeHighlighted when
-        # the cursor lands on the same node.
-        tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
-        data = tree_widget.get_cursor_node_data()
-        if data:
-            node_type, session, window, pane = data
-            self._update_detail_panel(node_type, session, window, pane)
-
     def on_tmux_tree_view_node_info(self, message: TmuxTreeView.NodeInfo) -> None:
         """Handle node highlight → update detail panel."""
         self._update_detail_panel(
