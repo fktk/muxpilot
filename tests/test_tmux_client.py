@@ -159,27 +159,36 @@ class TestNavigateTo:
 
 class TestCapture:
     def test_returns_list(self):
-        p = _mock_pane(pane_id="%0")
-        p.capture_pane.return_value = ["a", "b"]
-        c = _client_with([_mock_session(windows=[_mock_window(panes=[p])])])
-        assert c.capture_pane_content("%0") == ["a", "b"]
+        with patch("muxpilot.tmux_client.subprocess.run", return_value=_list_panes_output(["a", "b"])):
+            c = TmuxClient()
+            assert c.capture_pane_content("%0") == ["a", "b"]
 
     def test_returns_string(self):
-        p = _mock_pane(pane_id="%0")
-        p.capture_pane.return_value = "a\nb"
-        c = _client_with([_mock_session(windows=[_mock_window(panes=[p])])])
-        assert c.capture_pane_content("%0") == ["a", "b"]
+        """tmux capture-pane -p returns stdout as a single string."""
+        with patch("muxpilot.tmux_client.subprocess.run", return_value=_list_panes_output(["a", "b"])):
+            c = TmuxClient()
+            assert c.capture_pane_content("%0") == ["a", "b"]
 
     def test_nonexistent(self):
-        c = _client_with([_mock_session()])
-        assert c.capture_pane_content("%99") == []
+        with patch("muxpilot.tmux_client.subprocess.run", side_effect=subprocess.CalledProcessError(1, "tmux")):
+            c = TmuxClient()
+            assert c.capture_pane_content("%99") == []
 
     def test_exception(self):
-        import libtmux.exc
-        p = _mock_pane(pane_id="%0")
-        p.capture_pane.side_effect = libtmux.exc.LibTmuxException("fail")
-        c = _client_with([_mock_session(windows=[_mock_window(panes=[p])])])
-        assert c.capture_pane_content("%0") == []
+        with patch("muxpilot.tmux_client.subprocess.run", side_effect=subprocess.TimeoutExpired("tmux", 5.0)):
+            c = TmuxClient()
+            assert c.capture_pane_content("%0") == []
+
+    def test_uses_correct_lines_argument(self):
+        with patch("muxpilot.tmux_client.subprocess.run", return_value=_list_panes_output(["x"])) as mock_run:
+            c = TmuxClient()
+            c.capture_pane_content("%0", lines=10)
+        mock_run.assert_called_once_with(
+            ["tmux", "capture-pane", "-p", "-t", "%0", "-S", "-10"],
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+        )
 
 
 class TestHelpers:
