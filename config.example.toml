@@ -35,6 +35,12 @@ poll_interval = 2.0
 #   '(?i)Error|Exception|Traceback|FAILED|panic|Segmentation fault|FATAL',
 # ]
 
+[ui]
+# Detail panel width as a CSS fraction unit.
+# Larger values make the detail panel wider relative to the tree panel.
+# Default: "1fr" (tree:detail = 2:1)
+detail_panel_width = "1fr"
+
 [notifications]
 # Show toast notifications when tmux polling fails.
 # Set to false to suppress "tmux poll failed" messages during normal use.
