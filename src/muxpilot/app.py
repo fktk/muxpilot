@@ -15,7 +15,7 @@ from textual.widgets import Footer, Header, Static, Input
 
 from muxpilot.controllers import FilterState, PollingController, RenameController
 from muxpilot.label_store import LabelStore
-from muxpilot.models import TmuxTree, PaneStatus
+from muxpilot.models import PaneInfo, PaneStatus, SessionInfo, TmuxTree, WindowInfo
 from muxpilot.notify_channel import NotifyChannel
 from muxpilot.screens.help_screen import HelpScreen
 from muxpilot.screens.kill_modal import KillPaneModalScreen
@@ -298,15 +298,39 @@ class MuxpilotApp(App[str | None]):
         for event in events:
             status_bar.show_event(event)
 
+        # Refresh detail panel using the latest data for the currently selected
+        # node, since repopulating the tree does not emit NodeHighlighted when
+        # the cursor lands on the same node.
+        tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
+        data = tree_widget.get_cursor_node_data()
+        if data:
+            node_type, session, window, pane = data
+            self._update_detail_panel(node_type, session, window, pane)
+
     def on_tmux_tree_view_node_info(self, message: TmuxTreeView.NodeInfo) -> None:
         """Handle node highlight → update detail panel."""
+        self._update_detail_panel(
+            message.node_type,
+            message.session_info,
+            message.window_info,
+            message.pane_info,
+        )
+
+    def _update_detail_panel(
+        self,
+        node_type: str,
+        session: SessionInfo | None,
+        window: WindowInfo | None,
+        pane: PaneInfo | None,
+    ) -> None:
+        """Update the detail panel for the given node data."""
         detail = self.query_one("#detail-panel", DetailPanel)
-        if message.node_type == "pane" and message.pane_info and message.window_info and message.session_info:
-            detail.show_pane(message.pane_info, message.window_info, message.session_info)
-        elif message.node_type == "window" and message.window_info and message.session_info:
-            detail.show_window(message.window_info, message.session_info)
-        elif message.node_type == "session" and message.session_info:
-            detail.show_session(message.session_info)
+        if node_type == "pane" and pane and window and session:
+            detail.show_pane(pane, window, session)
+        elif node_type == "window" and window and session:
+            detail.show_window(window, session)
+        elif node_type == "session" and session:
+            detail.show_session(session)
 
     async def on_tmux_tree_view_pane_activated(self, message: TmuxTreeView.PaneActivated) -> None:
         """Handle pane activation (Enter) → navigate to the pane."""

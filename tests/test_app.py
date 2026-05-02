@@ -922,6 +922,40 @@ async def test_rename_escape_cancels():
         assert not ri.has_class("-active")
 
 
+@pytest.mark.asyncio
+async def test_detail_panel_updates_on_refresh_without_cursor_change():
+    """After _do_refresh, DetailPanel should update even when the selected node hasn't changed."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+
+    tree = make_tree(sessions=[
+        make_session(session_name="dev", windows=[
+            make_window(window_name="editor", panes=[
+                make_pane(pane_id="%0", is_active=False)
+            ])
+        ])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        detail = app.query_one("#detail-panel", DetailPanel)
+        initial_text = detail._markdown_source
+        # Default mock capture content is shown after mount
+        assert "user@host:~$" in initial_text
+
+        # Change the captured pane content and refresh without moving cursor
+        app._client.capture_pane_content.return_value = ["new output line"]
+        await app._do_refresh()
+
+        assert "new output line" in detail._markdown_source
+        assert "user@host:~$" not in detail._markdown_source
+
+
 # ============================================================================
 # Polling: error handling and backoff
 # ============================================================================
