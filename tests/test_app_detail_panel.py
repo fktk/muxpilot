@@ -172,6 +172,27 @@ async def test_detail_panel_pane_shows_session_and_window_before_title():
 
 
 @pytest.mark.asyncio
+async def test_detail_panel_window_clears_richlog():
+    """show_window should clear the RichLog output area."""
+    panel = DetailPanel()
+    session = make_session(session_name="dev", windows=[
+        make_window(window_name="editor", panes=[
+            make_pane(pane_id="%0", recent_lines=["line1"])
+        ])
+    ])
+    window = session.windows[0]
+    pane = window.panes[0]
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_pane(pane, window, session)
+        log = panel.query_one("#detail-output", RichLog)
+        assert len(log.lines) > 0
+
+        panel.show_window(window, session)
+        assert len(log.lines) == 0
+
+
+@pytest.mark.asyncio
 async def test_detail_panel_window_shows_session_first():
     """Window details should show Session before Name."""
     panel = DetailPanel()
