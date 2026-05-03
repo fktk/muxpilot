@@ -48,3 +48,8 @@ tree_panel_max_width = 60
 # Show toast notifications when tmux polling fails.
 # Set to false to suppress "tmux poll failed" messages during normal use.
 poll_errors = true
+
+# Regex pattern that triggers WAITING_INPUT status on a pane.
+# The notification message must contain both a pane id (e.g. %1) and
+# a match for this pattern. Leave empty to disable.
+# waiting_trigger_pattern = "WAITING"
