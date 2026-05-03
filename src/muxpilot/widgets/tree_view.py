@@ -52,6 +52,7 @@ class TmuxTreeView(Tree[Text]):
         super().__init__(Text("tmux"), name=name, id=id)
         self._pane_map: dict[str, tuple[SessionInfo, WindowInfo, PaneInfo]] = {}
         self._node_data: dict[int, tuple[str, SessionInfo | None, WindowInfo | None, PaneInfo | None]] = {}
+        self._node_map: dict[int, TreeNode[Text]] = {}
         self._expanded_paths: set[str] = set()
         self._known_paths: set[str] = set()
         self._selected_path: str | None = None
@@ -159,6 +160,7 @@ class TmuxTreeView(Tree[Text]):
         self.clear()
         self._pane_map.clear()
         self._node_data.clear()
+        self._node_map.clear()
         self.root.expand()
         
         name_filter_lower = name_filter.lower()
@@ -200,6 +202,7 @@ class TmuxTreeView(Tree[Text]):
                     expand=True,
                 )
                 self._node_data[session_node.id] = ("session", session, None, None)
+                self._node_map[session_node.id] = session_node
 
                 for window, panes in windows_to_add:
                     window_node = session_node.add(
@@ -207,12 +210,14 @@ class TmuxTreeView(Tree[Text]):
                         expand=True,
                     )
                     self._node_data[window_node.id] = ("window", session, window, None)
+                    self._node_map[window_node.id] = window_node
 
                     for pane in panes:
                         label_text = self._build_pane_label(pane)
 
                         pane_node = window_node.add_leaf(label_text)
                         self._node_data[pane_node.id] = ("pane", session, window, pane)
+                        self._node_map[pane_node.id] = pane_node
                         self._pane_map[pane.pane_id] = (session, window, pane)
 
         # Restore state after populating
@@ -233,20 +238,10 @@ class TmuxTreeView(Tree[Text]):
             node_type, session, window, pane = data
             if node_type != "pane" or pane is None or pane.status != PaneStatus.ACTIVE:
                 continue
-            # Find the node by traversing — node_id is the TreeNode.id
-            for node in self._walk_nodes():
-                if node.id == node_id:
-                    label = self._build_pane_label(pane, animated_icon)
-                    node.set_label(label)
-                    break
-
-    def _walk_nodes(self):
-        """Yield all nodes in the tree (breadth-first)."""
-        queue = [self.root]
-        while queue:
-            node = queue.pop(0)
-            yield node
-            queue.extend(node.children)
+            node = self._node_map.get(node_id)
+            if node is not None:
+                label = self._build_pane_label(pane, animated_icon)
+                node.set_label(label)
 
     def _build_pane_label(self, pane: PaneInfo, icon: str | None = None) -> Text:
         """Build a Rich Text label for a pane, optionally overriding the icon."""

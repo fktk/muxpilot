@@ -24,6 +24,19 @@ STATUS_ICONS: dict[PaneStatus, str] = {
 }
 
 
+def rich_to_markdown(rich_markup: str) -> str:
+    """Convert Rich console markup to Markdown bold.
+
+    Replaces [bold], [/bold], [bold red], [/bold red] with **.
+    """
+    return (
+        rich_markup.replace("[bold red]", "**")
+        .replace("[/bold red]", "**")
+        .replace("[bold]", "**")
+        .replace("[/bold]", "**")
+    )
+
+
 @dataclass
 class PaneInfo:
     """Information about a single tmux pane."""
