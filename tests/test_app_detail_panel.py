@@ -64,8 +64,13 @@ async def test_detail_panel_shows_pane_title_and_git():
         assert "proj" in text
         assert "feat/x" in text
         assert "12.0s idle" in text
-        assert "line1" in text
-        assert "line2" in text
+        assert "line1" not in text
+        assert "line2" not in text
+
+        log = panel.query_one("#detail-output", RichLog)
+        lines = log.lines
+        assert any("line1" in str(line) for line in lines)
+        assert any("line2" in str(line) for line in lines)
 
 
 @pytest.mark.asyncio
@@ -131,7 +136,7 @@ async def test_detail_panel_error_status_shows_clean_icon():
 
 @pytest.mark.asyncio
 async def test_detail_panel_pane_shows_session_and_window_before_title():
-    """Pane details should show Session and Window before Title, and not repeat them after Recent Output."""
+    """Pane details should show Session and Window before Title, and not repeat them in output."""
     panel = DetailPanel()
     session = make_session(session_name="my-session", windows=[
         make_window(window_name="my-window", window_index=3, panes=[
@@ -146,10 +151,8 @@ async def test_detail_panel_pane_shows_session_and_window_before_title():
         text = panel._markdown_source
 
         pane_section_start = text.find("## Pane")
-        recent_output_start = text.find("## Recent Output")
         assert pane_section_start != -1
-        assert recent_output_start != -1
-        assert pane_section_start < recent_output_start
+        assert "## Recent Output" not in text, "Recent Output should not be in markdown source"
 
         session_pos = text.find("- **Session:** my-session")
         window_pos = text.find("- **Window:** my-window (#3)")
@@ -159,16 +162,16 @@ async def test_detail_panel_pane_shows_session_and_window_before_title():
         assert window_pos != -1, "Window info missing"
         assert title_pos != -1, "Title info missing"
 
-        assert pane_section_start < session_pos < recent_output_start, "Session should be inside Pane section"
-        assert pane_section_start < window_pos < recent_output_start, "Window should be inside Pane section"
-        assert pane_section_start < title_pos < recent_output_start, "Title should be inside Pane section"
+        assert pane_section_start < session_pos, "Session should be inside Pane section"
+        assert pane_section_start < window_pos, "Window should be inside Pane section"
+        assert pane_section_start < title_pos, "Title should be inside Pane section"
 
         assert session_pos < window_pos < title_pos, "Order should be Session -> Window -> Title"
 
-        # Ensure Session/Window do not appear after Recent Output
-        after_recent = text[recent_output_start:]
-        assert "**Session:**" not in after_recent, "Session should not repeat after Recent Output"
-        assert "**Window:**" not in after_recent, "Window should not repeat after Recent Output"
+        # Ensure output is in RichLog, not markdown
+        log = panel.query_one("#detail-output", RichLog)
+        lines = log.lines
+        assert any("line1" in str(line) for line in lines)
 
 
 @pytest.mark.asyncio
@@ -273,9 +276,10 @@ async def test_detail_panel_updates_on_refresh_without_cursor_change():
         await pilot.pause()
 
         detail = app.query_one("#detail-panel", DetailPanel)
-        initial_text = detail._markdown_source
+        log = detail.query_one("#detail-output", RichLog)
+        initial_lines = [str(line) for line in log.lines]
         # Default mock capture content is shown after mount
-        assert "user@host:~$" in initial_text
+        assert any("user@host:~$" in line for line in initial_lines)
 
         # Change the captured pane content and refresh without moving cursor
         app._client.capture_pane_content.return_value = ["new output line"]
@@ -284,8 +288,9 @@ async def test_detail_panel_updates_on_refresh_without_cursor_change():
         await pilot.pause()
         await pilot.pause()
 
-        assert "new output line" in detail._markdown_source
-        assert "user@host:~$" not in detail._markdown_source
+        updated_lines = [str(line) for line in log.lines]
+        assert any("new output line" in line for line in updated_lines)
+        assert not any("user@host:~$" in line for line in updated_lines)
 
 
 @pytest.mark.asyncio
@@ -310,7 +315,9 @@ async def test_detail_panel_updates_on_poll_without_events():
         await pilot.pause()
 
         detail = app.query_one("#detail-panel", DetailPanel)
-        assert "user@host:~$" in detail._markdown_source
+        log = detail.query_one("#detail-output", RichLog)
+        initial_lines = [str(line) for line in log.lines]
+        assert any("user@host:~$" in line for line in initial_lines)
 
         # Build a new tree with updated recent_lines but no events
         updated_tree = make_tree(sessions=[
@@ -331,8 +338,9 @@ async def test_detail_panel_updates_on_poll_without_events():
             await pilot.pause()
             await pilot.pause()
 
-        assert "polled output" in detail._markdown_source
-        assert "user@host:~$" not in detail._markdown_source
+        updated_lines = [str(line) for line in log.lines]
+        assert any("polled output" in line for line in updated_lines)
+        assert not any("user@host:~$" in line for line in updated_lines)
 
 
 # ============================================================================
