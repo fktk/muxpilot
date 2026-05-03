@@ -114,7 +114,7 @@ The optimal usage is like a command center: jump from muxpilot to a working pane
 
 ## 🔔 Toast Notifications
 
-muxpilot displays toast notifications in the lower right corner of the screen. These are automatically shown for structural changes such as pane additions/removals and during manual refresh.
+muxpilot displays toast notifications in the lower right corner of the screen. These are shown for external FIFO messages and polling errors.
 
 ### External Notifications
 
