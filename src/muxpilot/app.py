@@ -453,7 +453,23 @@ class MuxpilotApp(App[str | None]):
             msg = self._notify_channel.receive()
             if msg is None:
                 break
-            self.notify(msg, timeout=5)
+            event = self._watcher.process_notification(msg)
+            if event:
+                # Refresh UI to reflect the status change
+                if self._watcher._last_tree is not None:
+                    self._apply_labels(self._watcher._last_tree)
+                    tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
+                    tree_widget.populate(
+                        self._watcher._last_tree,
+                        current_pane_id=self._current_pane_id,
+                        status_filter=self._status_filter,
+                        name_filter=self._name_filter,
+                    )
+                self.notify(
+                    f"{event.pane_id} → {event.new_status.value}", timeout=3
+                )
+            else:
+                self.notify(msg, timeout=5)
 
     def get_system_commands(self, screen):
         """コマンドパレットから Keys / Screenshot を除外する。"""
