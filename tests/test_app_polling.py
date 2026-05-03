@@ -123,7 +123,7 @@ async def test_poll_tmux_pauses_timer_on_exception():
         await app._poll_tmux()
         app._polling.poll_timer.pause.assert_called_once()
         mock_set_interval.assert_called_once_with(
-            DEFAULT_POLL_INTERVAL * 2, app._polling._on_tick_wrapper, repeat=False
+            DEFAULT_POLL_INTERVAL * 2, app._polling._on_tick_wrapper
         )
 
 
@@ -163,7 +163,7 @@ async def test_poll_tmux_backoff_caps_at_max():
         await app._poll_tmux()
         assert app._polling.backoff == MAX_POLL_BACKOFF_SECONDS
         mock_set_interval.assert_called_once_with(
-            MAX_POLL_BACKOFF_SECONDS, app._polling._on_tick_wrapper, repeat=False
+            MAX_POLL_BACKOFF_SECONDS, app._polling._on_tick_wrapper
         )
         # Another failure should stay at the cap
         mock_set_interval = MagicMock()
@@ -171,7 +171,7 @@ async def test_poll_tmux_backoff_caps_at_max():
         await app._poll_tmux()
         assert app._polling.backoff == MAX_POLL_BACKOFF_SECONDS
         mock_set_interval.assert_called_once_with(
-            MAX_POLL_BACKOFF_SECONDS, app._polling._on_tick_wrapper, repeat=False
+            MAX_POLL_BACKOFF_SECONDS, app._polling._on_tick_wrapper
         )
 
 

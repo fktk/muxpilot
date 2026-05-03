@@ -31,10 +31,9 @@ def _make_coordinator(
         notify = MagicMock()
 
     if set_interval is None:
-        def _set_interval(delay, callback, repeat=True):
+        def _set_interval(delay, callback):
             timer = MagicMock()
             timer.delay = delay
-            timer.repeat = repeat
             return timer
         set_interval = _set_interval
 
@@ -54,7 +53,7 @@ class TestTimerLifecycle:
         tc = _make_coordinator(set_interval=set_interval)
         tc.start()
         set_interval.assert_called_once_with(
-            DEFAULT_POLL_INTERVAL, tc._on_tick_wrapper, repeat=True
+            DEFAULT_POLL_INTERVAL, tc._on_tick_wrapper
         )
 
     def test_stop_stops_timers(self):
