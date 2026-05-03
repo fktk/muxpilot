@@ -828,11 +828,13 @@ async def test_notification_waiting_trigger_updates_ui():
     async with app.run_test() as pilot:
         app._notify_channel.receive = MagicMock(side_effect=["%0 WAITING", None])
 
-        await app._check_notifications()
-        await pilot.pause()
+        with patch.object(app, "notify") as mock_notify:
+            app._check_notifications()
+            await pilot.pause()
 
-        # The watcher should have updated the pane status
-        assert app._watcher.activities["%0"].status == PaneStatus.WAITING_INPUT
+            # The watcher should have updated the pane status
+            assert app._watcher.activities["%0"].status == PaneStatus.WAITING_INPUT
+            mock_notify.assert_called_once_with("%0 → waiting", timeout=3)
 
 
 @pytest.mark.asyncio
@@ -848,17 +850,38 @@ async def test_notification_no_match_shows_raw_toast():
     async with app.run_test() as pilot:
         app._notify_channel.receive = MagicMock(side_effect=["hello world", None])
 
-        # Mock app.notify to verify it's called with the raw message
-        original_notify = app.notify
-        app.notify = MagicMock()
+        with patch.object(app, "notify") as mock_notify:
+            app._check_notifications()
+            await pilot.pause()
 
-        await app._check_notifications()
-        await pilot.pause()
+            mock_notify.assert_called_once_with("hello world", timeout=5)
 
-        app.notify.assert_called_once_with("hello world", timeout=5)
 
-        # Restore original notify
-        app.notify = original_notify
+@pytest.mark.asyncio
+async def test_notification_waiting_trigger_before_first_poll():
+    """A notification before first poll should update activity but not crash."""
+    from muxpilot.models import PaneStatus
+    import re
+
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", status=PaneStatus.ACTIVE),
+        ])])
+    ])
+    app = _patched_app(tree=tree)
+    app._watcher.poll()  # seed activities
+    app._watcher._last_tree = None  # simulate no poll yet
+    app._watcher.waiting_trigger_pattern = re.compile("WAITING")
+
+    async with app.run_test() as pilot:
+        app._notify_channel.receive = MagicMock(side_effect=["%0 WAITING", None])
+        with patch.object(app, "notify") as mock_notify:
+            app._check_notifications()
+            await pilot.pause()
+            # Should not crash; activity updated
+            assert app._watcher.activities["%0"].status == PaneStatus.WAITING_INPUT
+            # Toast should still be shown
+            mock_notify.assert_called_once_with("%0 → waiting", timeout=3)
 
 
 # ============================================================================

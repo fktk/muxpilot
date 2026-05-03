@@ -447,7 +447,7 @@ class MuxpilotApp(App[str | None]):
             event.prevent_default()
             event.stop()
 
-    async def _check_notifications(self) -> None:
+    def _check_notifications(self) -> None:
         """Consume messages from NotifyChannel and display as Textual notifications."""
         while True:
             msg = self._notify_channel.receive()
@@ -458,6 +458,10 @@ class MuxpilotApp(App[str | None]):
                 # Refresh UI to reflect the status change
                 if self._watcher._last_tree is not None:
                     self._apply_labels(self._watcher._last_tree)
+                    for pane in self._watcher._last_tree.all_panes():
+                        if pane.pane_id == event.pane_id:
+                            pane.status = event.new_status
+                            break
                     tree_widget = self.query_one("#tmux-tree", TmuxTreeView)
                     tree_widget.populate(
                         self._watcher._last_tree,
