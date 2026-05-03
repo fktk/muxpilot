@@ -13,6 +13,7 @@ from conftest import make_mock_client, make_pane, make_session, make_tree, make_
 
 
 import pathlib
+import re
 
 def _make_watcher(
     tree=None, capture=None, current_pane_id=None, idle_threshold=10.0, config_path=pathlib.Path("/nonexistent-muxpilot-config")
@@ -278,3 +279,75 @@ class TestPoll:
         w = TmuxWatcher(client)
         tree, _ = w.poll()
         assert tree.all_panes()[0].idle_seconds == 0.0
+
+
+class TestProcessNotification:
+    """Tests for process_notification — toast-triggered status changes."""
+
+    def _watcher_with_pattern(self, pattern="WAITING"):
+        tree = make_tree(sessions=[
+            make_session(windows=[make_window(panes=[
+                make_pane(pane_id="%0", status=PaneStatus.ACTIVE),
+                make_pane(pane_id="%1", status=PaneStatus.ERROR),
+            ])])
+        ])
+        client = make_mock_client(tree=tree)
+        watcher = TmuxWatcher(client, config_path=pathlib.Path("/nonexistent"))
+        watcher.waiting_trigger_pattern = re.compile(pattern)
+        # Seed activities so panes are known
+        watcher.poll()
+        # Restore intended starting statuses (poll() resets them based on mock capture content)
+        watcher.activities["%1"].status = PaneStatus.ERROR
+        return watcher
+
+    def test_matching_message_returns_event_and_updates_status(self):
+        w = self._watcher_with_pattern()
+        event = w.process_notification("Task complete %0 WAITING")
+        assert event is not None
+        assert event.event_type == "status_changed"
+        assert event.pane_id == "%0"
+        assert event.new_status == PaneStatus.WAITING_INPUT
+        assert w.activities["%0"].status == PaneStatus.WAITING_INPUT
+
+    def test_matching_message_without_pane_id_returns_none(self):
+        w = self._watcher_with_pattern()
+        event = w.process_notification("Just WAITING here")
+        assert event is None
+
+    def test_message_with_pane_id_but_no_pattern_match_returns_none(self):
+        w = self._watcher_with_pattern()
+        event = w.process_notification("%0 is done")
+        assert event is None
+
+    def test_unknown_pane_returns_none(self):
+        w = self._watcher_with_pattern()
+        event = w.process_notification("%99 WAITING")
+        assert event is None
+
+    def test_disabled_pattern_returns_none(self):
+        w = self._watcher_with_pattern()
+        w.waiting_trigger_pattern = None
+        event = w.process_notification("%0 WAITING")
+        assert event is None
+
+    def test_regex_pattern_match(self):
+        w = self._watcher_with_pattern(pattern="(?i)waiting|ready")
+        event = w.process_notification("%0 ready for input")
+        assert event is not None
+        assert event.new_status == PaneStatus.WAITING_INPUT
+
+    def test_already_waiting_returns_event(self):
+        """Even if pane is already WAITING_INPUT, return event for UI feedback."""
+        w = self._watcher_with_pattern()
+        w.activities["%0"].status = PaneStatus.WAITING_INPUT
+        event = w.process_notification("%0 WAITING")
+        assert event is not None
+        assert event.new_status == PaneStatus.WAITING_INPUT
+
+    def test_error_to_waiting_transition(self):
+        w = self._watcher_with_pattern()
+        event = w.process_notification("%1 WAITING")
+        assert event is not None
+        assert event.old_status == PaneStatus.ERROR
+        assert event.new_status == PaneStatus.WAITING_INPUT
+        assert w.activities["%1"].status == PaneStatus.WAITING_INPUT

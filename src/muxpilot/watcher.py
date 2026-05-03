@@ -309,3 +309,36 @@ class TmuxWatcher:
                 )
 
         return events
+
+    def process_notification(self, message: str) -> TmuxEvent | None:
+        """Parse a notification message and update pane status if it matches.
+
+        Returns a TmuxEvent on status change, or None if no match.
+        """
+        if self.waiting_trigger_pattern is None:
+            return None
+
+        # Find first pane id token
+        pane_match = re.search(r"%[0-9]+", message)
+        if not pane_match:
+            return None
+        pane_id = pane_match.group(0)
+
+        # Check pattern match
+        if not self.waiting_trigger_pattern.search(message):
+            return None
+
+        activity = self.activities.get(pane_id)
+        if activity is None:
+            return None
+
+        old_status = activity.status
+        activity.status = PaneStatus.WAITING_INPUT
+
+        return TmuxEvent(
+            event_type="status_changed",
+            pane_id=pane_id,
+            old_status=old_status,
+            new_status=PaneStatus.WAITING_INPUT,
+            message=f"{pane_id}: {old_status.value} → waiting",
+        )
