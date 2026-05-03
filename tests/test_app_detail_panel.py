@@ -7,6 +7,7 @@ import pytest
 from muxpilot.models import PaneStatus
 from muxpilot.widgets.detail_panel import DetailPanel
 from muxpilot.widgets.tree_view import TmuxTreeView
+from textual.widgets import Markdown, RichLog
 
 from _test_app_common import _patched_app
 from conftest import make_pane, make_session, make_tree, make_window
@@ -22,6 +23,18 @@ def _run_detail_panel(panel):
             yield panel
 
     return _TestApp()
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_composes_markdown_and_richlog():
+    """DetailPanel should contain a Markdown and a RichLog widget."""
+    panel = DetailPanel()
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        meta = panel.query_one("#detail-meta", Markdown)
+        log = panel.query_one("#detail-output", RichLog)
+        assert meta is not None
+        assert log is not None
 
 
 @pytest.mark.asyncio

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.widget import Widget
-from textual.widgets import Markdown
+from textual.widgets import Markdown, RichLog
 
 from muxpilot.models import (
     PaneInfo,
@@ -44,15 +44,27 @@ class DetailPanel(Widget):
     DetailPanel Markdown H2 {
         color: $accent;
     }
+
+    #detail-meta {
+        height: auto;
+        max-height: 60%;
+    }
+
+    #detail-output {
+        height: 1fr;
+        border-top: solid $primary-background-lighten-2;
+    }
     """
 
     def __init__(self, name: str | None = None, id: str | None = None) -> None:
         super().__init__(name=name, id=id)
-        self._content = Markdown("Select a node to see details", id="detail-content")
+        self._meta = Markdown("Select a node to see details", id="detail-meta")
+        self._log = RichLog(id="detail-output", highlight=True, markup=True)
         self._markdown_source = ""
 
     def compose(self) -> ComposeResult:
-        yield self._content
+        yield self._meta
+        yield self._log
 
     def show_pane(self, pane: PaneInfo, window: WindowInfo, session: SessionInfo) -> None:
         """Display pane details."""
@@ -81,17 +93,14 @@ class DetailPanel(Widget):
         elif pane.status == PaneStatus.WAITING_INPUT:
             text += "\n> **Waiting for input**\n"
 
-        text += (
-            "\n## Recent Output\n\n"
-            "```\n"
-        )
+        self._markdown_source = text
+        self._meta.update(text)
+
+        log = self.query_one("#detail-output", RichLog)
+        log.clear()
         preview = pane.recent_lines if pane.recent_lines else ["(no output)"]
         for line in preview:
-            text += f"{line}\n"
-        text += "```\n\n"
-
-        self._markdown_source = text
-        self._content.update(text)
+            log.write(line)
 
     def show_window(self, window: WindowInfo, session: SessionInfo) -> None:
         """Display window details."""
@@ -104,7 +113,8 @@ class DetailPanel(Widget):
             f"- **Active:** {'Yes' if window.is_active else 'No'}\n"
         )
         self._markdown_source = text
-        self._content.update(text)
+        self._meta.update(text)
+        self.query_one("#detail-output", RichLog).clear()
 
     def show_session(self, session: SessionInfo) -> None:
         """Display session details."""
@@ -115,9 +125,11 @@ class DetailPanel(Widget):
             f"- **Attached:** {'Yes' if session.is_attached else 'No'}\n"
         )
         self._markdown_source = text
-        self._content.update(text)
+        self._meta.update(text)
+        self.query_one("#detail-output", RichLog).clear()
 
     def clear_detail(self) -> None:
         """Clear the detail panel."""
         self._markdown_source = "Select a node to see details"
-        self._content.update(self._markdown_source)
+        self._meta.update(self._markdown_source)
+        self.query_one("#detail-output", RichLog).clear()
