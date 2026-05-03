@@ -68,6 +68,7 @@ class TmuxWatcher:
         # Load default patterns
         self.prompt_patterns = list(DEFAULT_PROMPT_PATTERNS)
         self.error_patterns = list(DEFAULT_ERROR_PATTERNS)
+        self.waiting_trigger_pattern: re.Pattern[str] | None = None
 
         # Override with config if present
         if config_path is None:
@@ -92,6 +93,10 @@ class TmuxWatcher:
                     notify_cfg = config.get("notifications", {})
                     if "poll_errors" in notify_cfg:
                         self.notify_poll_errors = bool(notify_cfg["poll_errors"])
+
+                    waiting_pattern = notify_cfg.get("waiting_trigger_pattern", "")
+                    if waiting_pattern:
+                        self.waiting_trigger_pattern = re.compile(waiting_pattern)
             except Exception as e:
                 self._config_error = str(e)
 
