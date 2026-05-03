@@ -1,0 +1,279 @@
+"""Tests for DetailPanel content rendering."""
+
+from __future__ import annotations
+
+import pytest
+
+from muxpilot.models import PaneStatus, _shorten_path
+from muxpilot.widgets.detail_panel import DetailPanel
+from muxpilot.widgets.tree_view import TmuxTreeView
+
+from _test_app_common import _patched_app
+from conftest import make_pane, make_session, make_tree, make_window
+
+
+def _run_detail_panel(panel):
+    """Wrap a DetailPanel in a minimal App and run it in a test context."""
+    from textual.app import App
+    from textual.app import ComposeResult
+
+    class _TestApp(App):
+        def compose(self) -> ComposeResult:
+            yield panel
+
+    return _TestApp()
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_shows_pane_title_and_git():
+    """Detail panel should display pane title, repo, branch, and idle time."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="dev", windows=[
+        make_window(window_name="editor", panes=[
+            make_pane(
+                pane_id="%0",
+                pane_title="agent-a",
+                repo_name="proj",
+                branch="feat/x",
+                idle_seconds=12.0,
+                status=PaneStatus.IDLE,
+                recent_lines=["line1", "line2"],
+            )
+        ])
+    ])
+    window = session.windows[0]
+    pane = window.panes[0]
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_pane(pane, window, session)
+        text = panel._markdown_source
+        assert "agent-a" in text
+        assert "proj" in text
+        assert "feat/x" in text
+        assert "12.0s idle" in text
+        assert "line1" in text
+        assert "line2" in text
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_error_status_shows_clean_icon():
+    """Detail panel should render ERROR status icon cleanly without broken markup."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="dev", windows=[
+        make_window(window_name="editor", panes=[
+            make_pane(pane_id="%0", status=PaneStatus.ERROR)
+        ])
+    ])
+    window = session.windows[0]
+    pane = window.panes[0]
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_pane(pane, window, session)
+        text = panel._markdown_source
+
+        # Should NOT contain broken/unclosed markup fragments
+        assert "[bold" not in text, f"Broken bold markup found: {text}"
+        assert "red]" not in text, f"Broken red markup found: {text}"
+        # Should show the bold letter E in Markdown
+        assert "**E**" in text, f"Bold E not found in status line: {text}"
+        assert "error" in text
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_pane_shows_session_and_window_before_title():
+    """Pane details should show Session and Window before Title, and not repeat them after Recent Output."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="my-session", windows=[
+        make_window(window_name="my-window", window_index=3, panes=[
+            make_pane(pane_id="%0", pane_title="agent-a", recent_lines=["line1"])
+        ])
+    ])
+    window = session.windows[0]
+    pane = window.panes[0]
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_pane(pane, window, session)
+        text = panel._markdown_source
+
+        pane_section_start = text.find("## Pane")
+        recent_output_start = text.find("## Recent Output")
+        assert pane_section_start != -1
+        assert recent_output_start != -1
+        assert pane_section_start < recent_output_start
+
+        session_pos = text.find("- **Session:** my-session")
+        window_pos = text.find("- **Window:** my-window (#3)")
+        title_pos = text.find("- **Title:** agent-a")
+
+        assert session_pos != -1, "Session info missing"
+        assert window_pos != -1, "Window info missing"
+        assert title_pos != -1, "Title info missing"
+
+        assert pane_section_start < session_pos < recent_output_start, "Session should be inside Pane section"
+        assert pane_section_start < window_pos < recent_output_start, "Window should be inside Pane section"
+        assert pane_section_start < title_pos < recent_output_start, "Title should be inside Pane section"
+
+        assert session_pos < window_pos < title_pos, "Order should be Session -> Window -> Title"
+
+        # Ensure Session/Window do not appear after Recent Output
+        after_recent = text[recent_output_start:]
+        assert "**Session:**" not in after_recent, "Session should not repeat after Recent Output"
+        assert "**Window:**" not in after_recent, "Window should not repeat after Recent Output"
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_window_shows_session_first():
+    """Window details should show Session before Name."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="my-session", windows=[
+        make_window(window_name="my-window", window_index=3, panes=[
+            make_pane(pane_id="%0")
+        ])
+    ])
+    window = session.windows[0]
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_window(window, session)
+        text = panel._markdown_source
+
+        window_section_start = text.find("## Window")
+        session_pos = text.find("- **Session:** my-session")
+        name_pos = text.find("- **Name:** my-window")
+
+        assert window_section_start != -1
+        assert session_pos != -1, "Session info missing"
+        assert name_pos != -1, "Name info missing"
+
+        assert window_section_start < session_pos < name_pos, "Session should appear before Name in Window section"
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_window_does_not_show_pane_count():
+    """Window details should not include pane count."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="my-session", windows=[
+        make_window(window_name="my-window", window_index=3, panes=[
+            make_pane(pane_id="%0"),
+            make_pane(pane_id="%1"),
+        ])
+    ])
+    window = session.windows[0]
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_window(window, session)
+        text = panel._markdown_source
+        assert "**Panes:**" not in text
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_session_does_not_show_counts():
+    """Session details should not include window or pane counts."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+    panel = DetailPanel()
+    session = make_session(session_name="my-session", windows=[
+        make_window(window_name="w1", window_index=0, panes=[make_pane(pane_id="%0")]),
+        make_window(window_name="w2", window_index=1, panes=[make_pane(pane_id="%1"), make_pane(pane_id="%2")]),
+    ])
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_session(session)
+        text = panel._markdown_source
+        assert "**Windows:**" not in text
+    assert "**Panes:**" not in text
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_updates_on_refresh_without_cursor_change():
+    """After _do_refresh, DetailPanel should update even when the selected node hasn't changed."""
+    from muxpilot.widgets.detail_panel import DetailPanel
+
+    tree = make_tree(sessions=[
+        make_session(session_name="dev", windows=[
+            make_window(window_name="editor", panes=[
+                make_pane(pane_id="%0", is_active=False)
+            ])
+        ])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        detail = app.query_one("#detail-panel", DetailPanel)
+        initial_text = detail._markdown_source
+        # Default mock capture content is shown after mount
+        assert "user@host:~$" in initial_text
+
+        # Change the captured pane content and refresh without moving cursor
+        app._client.capture_pane_content.return_value = ["new output line"]
+        await app._do_refresh()
+        # Wait for call_after_refresh to fire after tree repopulates
+        await pilot.pause()
+        await pilot.pause()
+
+        assert "new output line" in detail._markdown_source
+        assert "user@host:~$" not in detail._markdown_source
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_updates_on_poll_without_events():
+    """Periodic poll without status events must still refresh DetailPanel."""
+    from unittest.mock import patch
+    from muxpilot.widgets.detail_panel import DetailPanel
+
+    tree = make_tree(sessions=[
+        make_session(session_name="dev", windows=[
+            make_window(window_name="editor", panes=[
+                make_pane(pane_id="%0", is_active=False, status=PaneStatus.ACTIVE)
+            ])
+        ])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        detail = app.query_one("#detail-panel", DetailPanel)
+        assert "user@host:~$" in detail._markdown_source
+
+        # Build a new tree with updated recent_lines but no events
+        updated_tree = make_tree(sessions=[
+            make_session(session_name="dev", windows=[
+                make_window(window_name="editor", panes=[
+                    make_pane(
+                        pane_id="%0",
+                        is_active=False,
+                        status=PaneStatus.ACTIVE,
+                        recent_lines=["polled output"],
+                    )
+                ])
+            ])
+        ])
+        # Patch watcher.poll to return updated tree with no events
+        with patch.object(app._watcher, "poll", return_value=(updated_tree, [])):
+            await app._poll_tmux()
+            await pilot.pause()
+            await pilot.pause()
+
+        assert "polled output" in detail._markdown_source
+        assert "user@host:~$" not in detail._markdown_source
+
+
+# ============================================================================
+# Polling: error handling and backoff
+# ============================================================================
+
+
