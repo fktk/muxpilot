@@ -108,11 +108,6 @@ class TmuxWatcher:
         """Return the config loading error message, if any."""
         return self._config_error
 
-    @property
-    def config_error(self) -> str | None:
-        """Return the config loading error message, if any."""
-        return self._config_error
-
     def poll(self) -> tuple[TmuxTree, list[TmuxEvent]]:
         """
         Perform one poll cycle:
@@ -313,7 +308,7 @@ class TmuxWatcher:
     def process_notification(self, message: str) -> TmuxEvent | None:
         """Parse a notification message and update pane status if it matches.
 
-        Returns a TmuxEvent on status change, or None if no match.
+        Returns a TmuxEvent when both pane id and pattern are found, or None if no match.
         """
         if self.waiting_trigger_pattern is None:
             return None
@@ -340,5 +335,5 @@ class TmuxWatcher:
             pane_id=pane_id,
             old_status=old_status,
             new_status=PaneStatus.WAITING_INPUT,
-            message=f"{pane_id}: {old_status.value} → waiting",
+            message=f"{pane_id}: {old_status.value} → {PaneStatus.WAITING_INPUT.value}",
         )

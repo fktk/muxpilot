@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pathlib
+import re
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,10 +12,6 @@ from muxpilot.models import PaneActivity, PaneStatus, TmuxTree
 from muxpilot.watcher import TmuxWatcher
 
 from conftest import make_mock_client, make_pane, make_session, make_tree, make_window
-
-
-import pathlib
-import re
 
 def _make_watcher(
     tree=None, capture=None, current_pane_id=None, idle_threshold=10.0, config_path=pathlib.Path("/nonexistent-muxpilot-config")
@@ -291,12 +289,12 @@ class TestProcessNotification:
                 make_pane(pane_id="%1", status=PaneStatus.ERROR),
             ])])
         ])
-        client = make_mock_client(tree=tree)
+        client = make_mock_client(tree=tree, capture_content=["normal output"])
         watcher = TmuxWatcher(client, config_path=pathlib.Path("/nonexistent"))
         watcher.waiting_trigger_pattern = re.compile(pattern)
-        # Seed activities so panes are known
+        # Seed activities so panes are known; poll() leaves them ACTIVE due to capture_content
         watcher.poll()
-        # Restore intended starting statuses (poll() resets them based on mock capture content)
+        # Manually set %1 to ERROR for the error transition test
         watcher.activities["%1"].status = PaneStatus.ERROR
         return watcher
 
