@@ -69,6 +69,43 @@ async def test_detail_panel_shows_pane_title_and_git():
 
 
 @pytest.mark.asyncio
+async def test_detail_panel_shows_pane_meta_in_markdown_and_output_in_richlog():
+    """show_pane should put meta in Markdown and recent_lines in RichLog."""
+    panel = DetailPanel()
+    session = make_session(session_name="dev", windows=[
+        make_window(window_name="editor", panes=[
+            make_pane(
+                pane_id="%0",
+                pane_title="agent-a",
+                repo_name="proj",
+                branch="feat/x",
+                idle_seconds=12.0,
+                status=PaneStatus.IDLE,
+                recent_lines=["line1", "line2"],
+            )
+        ])
+    ])
+    window = session.windows[0]
+    pane = window.panes[0]
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_pane(pane, window, session)
+        # Markdown should contain meta, not output section
+        assert "agent-a" in panel._markdown_source
+        assert "proj" in panel._markdown_source
+        assert "feat/x" in panel._markdown_source
+        assert "12.0s idle" in panel._markdown_source
+        assert "## Recent Output" not in panel._markdown_source
+        assert "line1" not in panel._markdown_source
+
+        # RichLog should contain output lines
+        log = panel.query_one("#detail-output", RichLog)
+        lines = log.lines
+        assert any("line1" in str(line) for line in lines)
+        assert any("line2" in str(line) for line in lines)
+
+
+@pytest.mark.asyncio
 async def test_detail_panel_error_status_shows_clean_icon():
     """Detail panel should render ERROR status icon cleanly without broken markup."""
     panel = DetailPanel()
