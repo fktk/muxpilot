@@ -30,23 +30,50 @@ uv run pytest tests/test_watcher.py -v  # 単一ファイル
 
 ```
 src/muxpilot/
-├── app.py           # Textual App（レイアウト・キーバインド）
-├── models.py        # データモデル（Session/Window/Pane/PaneStatus）
-├── tmux_client.py   # libtmux ラッパー
-├── watcher.py       # ポーリング監視・パターン検出（~/.config/muxpilot/config.toml で設定可）
-├── label_store.py   # カスタムラベル・テーマの TOML 永続化
-├── notify_channel.py # FIFO ベースの外部通知受信
-└── widgets/         # TUI ウィジェット（tree_view, detail_panel, status_bar）
+├── app.py              # Textual App（レイアウト・キーバインド・event handler の薄いラッパー）
+├── app_actions.py      # キーイベントアクションの実装（ActionHandler）
+├── app_ui.py           # ポーリング結果の UI 反映・詳細パネル更新（UIOrchestrator）
+├── controllers.py      # FilterState, PaneTitleManager（ Pane リネーム・フィルター状態）
+├── models.py           # データモデル（Session/Window/Pane/PaneStatus）
+├── pattern_matcher.py  # 出力パターン検出（waiting/error/active）
+├── status_tracker.py   # ペインごとの履歴・idle 秒数追跡
+├── structural_detector.py  # セッション/ウィンドウ/ペインの増減検出
+├── timer_coordinator.py    # ポーリングタイマー・バックオフ・クールダウン
+├── tmux_client.py      # libtmux ラッパー
+├── tree_parser.py      # tmux list-panes 出力パース
+├── watcher.py          # ポーリング監視・イベント生成（統合層）
+├── label_store.py      # テーマ・UI 設定の TOML 永続化
+├── notify_channel.py   # FIFO ベースの外部通知受信
+├── widgets/            # TUI ウィジェット（tree_view, detail_panel, filter_bar, status_bar）
+└── screens/            # 画面・モーダル（help_screen, kill_modal）
 
 tests/
-├── conftest.py      # 共通フィクスチャ・モックファクトリ
-├── test_models.py
-├── test_tmux_client.py
-├── test_watcher.py
-├── test_watcher_config.py
-├── test_app.py
+├── conftest.py              # 共通フィクスチャ・モックファクトリ
+├── _test_app_common.py      # _patched_app() ヘルパー
+├── test_app_detail_panel.py
+├── test_app_filter.py
+├── test_app_kill.py
+├── test_app_main.py
+├── test_app_navigation.py
+├── test_app_notifications.py
+├── test_app_polling.py
+├── test_app_rename.py
+├── test_app_ui.py
+├── test_filter_bar.py
+├── test_help_screen.py
+├── test_kill_modal.py
 ├── test_label_store.py
-└── test_notify_channel.py
+├── test_models.py
+├── test_pane_title_manager.py
+├── test_pattern_matcher.py
+├── test_status_tracker.py
+├── test_structural_detector.py
+├── test_timer_coordinator.py
+├── test_tmux_client.py
+├── test_tree_parser.py
+├── test_tree_view.py
+├── test_watcher.py
+└── test_watcher_config.py
 ```
 
 ## テスト方針
