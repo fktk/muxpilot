@@ -53,6 +53,7 @@ class TmuxTreeView(Tree[Text]):
         self._pane_map: dict[str, tuple[SessionInfo, WindowInfo, PaneInfo]] = {}
         self._node_data: dict[int, tuple[str, SessionInfo | None, WindowInfo | None, PaneInfo | None]] = {}
         self._expanded_paths: set[str] = set()
+        self._known_paths: set[str] = set()
         self._selected_path: str | None = None
         self._has_populated: bool = False
         self._animation_frame: int = 0
@@ -85,15 +86,18 @@ class TmuxTreeView(Tree[Text]):
     def _save_state(self) -> None:
         """Save the expanded state of all nodes and the currently selected node."""
         self._expanded_paths.clear()
+        self._known_paths.clear()
         
-        # Save expanded nodes
+        # Save expanded nodes and all known nodes
         nodes_to_check: list[TreeNode[Text]] = [self.root]
         while nodes_to_check:
             node = nodes_to_check.pop(0)
-            if node.is_expanded and node != self.root:
+            if node != self.root:
                 path = self._get_node_path(node)
                 if path:
-                    self._expanded_paths.add(path)
+                    self._known_paths.add(path)
+                    if node.is_expanded:
+                        self._expanded_paths.add(path)
             nodes_to_check.extend(node.children)
 
         # Save selected node
@@ -111,7 +115,7 @@ class TmuxTreeView(Tree[Text]):
             node = nodes_to_check.pop(0)
             if node != self.root:
                 path = self._get_node_path(node)
-                if path in self._expanded_paths:
+                if path in self._expanded_paths or path not in self._known_paths:
                     node.expand()
                 else:
                     node.collapse()
