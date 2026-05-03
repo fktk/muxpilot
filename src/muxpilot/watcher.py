@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import pathlib
 import re
@@ -15,6 +14,9 @@ from muxpilot.models import (
     TmuxEvent,
     TmuxTree,
 )
+from muxpilot.pattern_matcher import PatternMatcher
+from muxpilot.status_tracker import StatusTracker
+from muxpilot.structural_detector import StructuralChangeDetector
 from muxpilot.tmux_client import TmuxClient
 
 
@@ -61,13 +63,12 @@ class TmuxWatcher:
         self.capture_lines = capture_lines
         self.poll_interval = poll_interval
         self.preview_lines = preview_lines
-        self.activities: dict[str, PaneActivity] = {}
         self._config_error: str | None = None
         self.notify_poll_errors: bool = True
 
         # Load default patterns
-        self.prompt_patterns = list(DEFAULT_PROMPT_PATTERNS)
-        self.error_patterns = list(DEFAULT_ERROR_PATTERNS)
+        prompt_patterns = list(DEFAULT_PROMPT_PATTERNS)
+        error_patterns = list(DEFAULT_ERROR_PATTERNS)
         self.waiting_trigger_pattern: re.Pattern[str] | None = None
 
         # Override with config if present
@@ -81,11 +82,11 @@ class TmuxWatcher:
 
                     custom_prompts = watcher_cfg.get("prompt_patterns", [])
                     if custom_prompts:
-                        self.prompt_patterns = [re.compile(p) for p in custom_prompts]
+                        prompt_patterns = [re.compile(p) for p in custom_prompts]
 
                     custom_errors = watcher_cfg.get("error_patterns", [])
                     if custom_errors:
-                        self.error_patterns = [re.compile(p) for p in custom_errors]
+                        error_patterns = [re.compile(p) for p in custom_errors]
 
                     self.idle_threshold = watcher_cfg.get("idle_threshold", self.idle_threshold)
                     self.poll_interval = watcher_cfg.get("poll_interval", self.poll_interval)
@@ -100,6 +101,14 @@ class TmuxWatcher:
             except Exception as e:
                 self._config_error = str(e)
 
+        self._matcher = PatternMatcher(
+            prompt_patterns=prompt_patterns,
+            error_patterns=error_patterns,
+            idle_threshold=self.idle_threshold,
+        )
+        self._tracker = StatusTracker(preview_lines=preview_lines)
+        self._detector = StructuralChangeDetector()
+
         self._last_tree: TmuxTree | None = None
         self._last_poll_time: float | None = None
 
@@ -107,6 +116,26 @@ class TmuxWatcher:
     def config_error(self) -> str | None:
         """Return the config loading error message, if any."""
         return self._config_error
+
+    @property
+    def prompt_patterns(self) -> list[re.Pattern[str]]:
+        """Access prompt patterns (backward compatibility)."""
+        return self._matcher.prompt_patterns
+
+    @property
+    def error_patterns(self) -> list[re.Pattern[str]]:
+        """Access error patterns (backward compatibility)."""
+        return self._matcher.error_patterns
+
+    @property
+    def activities(self) -> dict[str, PaneActivity]:
+        """Access the underlying activity tracker state (for backward compatibility)."""
+        return self._tracker.activities
+
+    @activities.setter
+    def activities(self, value: dict[str, PaneActivity]) -> None:
+        """Replace the activity tracker state (for tests)."""
+        self._tracker.activities = value
 
     def poll(self) -> tuple[TmuxTree, list[TmuxEvent]]:
         """
@@ -121,7 +150,7 @@ class TmuxWatcher:
 
         # Detect structural changes
         if self._last_tree is not None:
-            events.extend(self._detect_structural_changes(self._last_tree, new_tree))
+            events.extend(self._detector.detect(self._last_tree, new_tree))
 
         # Analyze pane outputs and detect status changes
         current_pane_id = self.client.get_current_pane_id()
@@ -135,11 +164,11 @@ class TmuxWatcher:
                 continue
 
             content = self.client.capture_pane_content(pane.pane_id, self.capture_lines)
-            old_activity = self.activities.get(pane.pane_id)
-            new_activity = self._analyze_pane(pane.pane_id, content, old_activity, poll_elapsed)
+            old_activity = self._tracker.activities.get(pane.pane_id)
+            new_activity = self._tracker.analyze_pane(pane.pane_id, content, old_activity, poll_elapsed)
 
             old_status = old_activity.status if old_activity else PaneStatus.ACTIVE
-            new_status = self._determine_status(
+            new_status = self._matcher.determine_status(
                 content,
                 new_activity.last_line,
                 new_activity.idle_seconds,
@@ -166,153 +195,14 @@ class TmuxWatcher:
             pane.status = new_activity.status
             pane.idle_seconds = new_activity.idle_seconds
             pane.recent_lines = new_activity.recent_lines
-            self.activities[pane.pane_id] = new_activity
 
         # Clean up activities for removed panes
         current_pane_ids = {p.pane_id for p in new_tree.all_panes()}
-        for pane_id in list(self.activities.keys()):
-            if pane_id not in current_pane_ids:
-                del self.activities[pane_id]
+        self._tracker.cleanup_removed(current_pane_ids)
 
         self._last_tree = new_tree
         self._last_poll_time = now
         return new_tree, events
-
-    def _analyze_pane(
-        self,
-        pane_id: str,
-        content: list[str],
-        old_activity: PaneActivity | None,
-        poll_elapsed: float,
-    ) -> PaneActivity:
-        """Analyze pane content and track idle time."""
-        content_str = "\n".join(content)
-        content_hash = hashlib.md5(content_str.encode()).hexdigest()
-        last_line = content[-1].strip() if content else ""
-        recent_lines = content[-self.preview_lines:] if content else []
-
-        content_changed = not (old_activity and old_activity.last_content_hash == content_hash)
-
-        if old_activity and not content_changed:
-            idle_seconds = old_activity.idle_seconds + poll_elapsed
-        else:
-            idle_seconds = 0.0
-
-        # Preserve status_override; clear it when content changes
-        status_override = old_activity.status_override if old_activity else None
-        if content_changed and status_override is not None:
-            status_override = None
-
-        return PaneActivity(
-            pane_id=pane_id,
-            last_content_hash=content_hash,
-            last_line=last_line,
-            idle_seconds=idle_seconds,
-            status=old_activity.status if old_activity else PaneStatus.ACTIVE,
-            content_changed=content_changed,
-            recent_lines=recent_lines,
-            status_override=status_override,
-        )
-
-    def _determine_status(
-        self,
-        content: list[str],
-        last_line: str,
-        idle_seconds: float,
-        old_status: PaneStatus,
-        content_changed: bool,
-    ) -> PaneStatus:
-        """Determine the pane status based on output patterns.
-
-        Once a pane leaves ACTIVE, it keeps its status until content changes.
-        """
-        # If content hasn't changed and we were already in a non-ACTIVE state,
-        # preserve that status until new activity resets us.
-        if not content_changed and old_status != PaneStatus.ACTIVE:
-            return old_status
-
-        # Check for error patterns in recent output
-        recent_lines = content[-10:] if content else []
-        for line in recent_lines:
-            for pattern in self.error_patterns:
-                if pattern.search(line):
-                    return PaneStatus.ERROR
-
-        # Check if the last line looks like a prompt (waiting for input)
-        for pattern in self.prompt_patterns:
-            if pattern.search(last_line):
-                return PaneStatus.WAITING_INPUT
-
-        # Check if the pane has been idle long enough
-        if idle_seconds >= self.idle_threshold:
-            return PaneStatus.IDLE
-
-        return PaneStatus.ACTIVE
-
-    def _detect_structural_changes(
-        self,
-        old_tree: TmuxTree,
-        new_tree: TmuxTree,
-    ) -> list[TmuxEvent]:
-        """Detect additions/removals of sessions, windows, panes, and focus changes."""
-        events: list[TmuxEvent] = []
-
-        old_pane_ids = {p.pane_id for p in old_tree.all_panes()}
-        new_pane_ids = {p.pane_id for p in new_tree.all_panes()}
-
-        for pane_id in new_pane_ids - old_pane_ids:
-            events.append(
-                TmuxEvent(
-                    event_type="pane_added",
-                    pane_id=pane_id,
-                    message=f"Pane added: {pane_id}",
-                )
-            )
-
-        for pane_id in old_pane_ids - new_pane_ids:
-            events.append(
-                TmuxEvent(
-                    event_type="pane_removed",
-                    pane_id=pane_id,
-                    message=f"Pane removed: {pane_id}",
-                )
-            )
-
-        old_session_names = {s.session_name for s in old_tree.sessions}
-        new_session_names = {s.session_name for s in new_tree.sessions}
-
-        for name in new_session_names - old_session_names:
-            events.append(
-                TmuxEvent(
-                    event_type="session_added",
-                    session_name=name,
-                    message=f"Session added: {name}",
-                )
-            )
-
-        for name in old_session_names - new_session_names:
-            events.append(
-                TmuxEvent(
-                    event_type="session_removed",
-                    session_name=name,
-                    message=f"Session removed: {name}",
-                )
-            )
-
-        # Detect active pane (focus) changes
-        old_active = {p.pane_id for p in old_tree.all_panes() if p.is_active}
-        new_active = {p.pane_id for p in new_tree.all_panes() if p.is_active}
-        if old_active != new_active:
-            for pane_id in new_active - old_active:
-                events.append(
-                    TmuxEvent(
-                        event_type="focus_changed",
-                        pane_id=pane_id,
-                        message=f"Focus changed to: {pane_id}",
-                    )
-                )
-
-        return events
 
     def process_notification(self, message: str) -> TmuxEvent | None:
         """Parse a notification message and update pane status if it matches.
@@ -332,7 +222,7 @@ class TmuxWatcher:
         if not self.waiting_trigger_pattern.search(message):
             return None
 
-        activity = self.activities.get(pane_id)
+        activity = self._tracker.activities.get(pane_id)
         if activity is None:
             return None
 
