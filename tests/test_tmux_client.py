@@ -1,4 +1,4 @@
-"""Tests for muxpilot.tmux_client — TmuxClient with mocked libtmux."""
+"""Tests for muxpilot.tmux_client — TmuxClient with mocked libtmux/subprocess."""
 
 from __future__ import annotations
 
@@ -8,56 +8,22 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from muxpilot.tmux_client import (
-    TmuxClient,
-    _is_active_pane,
-    _is_active_str,
-    _is_active_window,
-    _is_attached,
-    _is_attached_str,
-)
+from muxpilot.tmux_client import TmuxClient
 
 
-def _mock_pane(pane_id="%0", cmd="bash", path="/home/user", active="1", w="80", h="24", pid="1234", title=""):
-    p = MagicMock()
-    p.pane_id = pane_id
-    p.pane_index = "0"
-    p.pane_current_command = cmd
-    p.pane_current_path = path
-    p.pane_active = active
-    p.pane_width = w
-    p.pane_height = h
-    p.pane_pid = pid
-    p.pane_title = title
-    return p
+def _list_panes_output(lines: list[str]):
+    class _Result:
+        def __init__(self, stdout: str, stderr: str = "", returncode: int = 0):
+            self.stdout = stdout
+            self.stderr = stderr
+            self.returncode = returncode
 
-
-def _mock_window(wid="@0", name="editor", idx="0", active="1", panes=None):
-    w = MagicMock()
-    w.window_id = wid
-    w.window_name = name
-    w.window_index = idx
-    w.window_active = active
-    w.panes = panes or [_mock_pane()]
-    return w
-
-
-def _mock_session(sname="main", sid="$0", attached="1", windows=None, name=None):
-    s = MagicMock()
-    s.session_name = sname
-    s.session_id = sid
-    s.session_attached = attached
-    s.name = name or sname
-    s.windows = windows or [_mock_window()]
-    return s
-
-
-def _client_with(sessions):
-    c = TmuxClient()
-    mock_server = MagicMock()
-    mock_server.sessions = sessions
-    c._server = mock_server
-    return c
+        def check_returncode(self):
+            if self.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    self.returncode, "tmux", output=self.stdout, stderr=self.stderr
+                )
+    return _Result("\n".join(lines))
 
 
 class TestEnv:
@@ -77,21 +43,6 @@ class TestEnv:
         env = {k: v for k, v in os.environ.items() if k != "TMUX_PANE"}
         with patch.dict(os.environ, env, clear=True):
             assert TmuxClient().get_current_pane_id() is None
-
-
-def _list_panes_output(lines: list[str]):
-    class _Result:
-        def __init__(self, stdout: str, stderr: str = "", returncode: int = 0):
-            self.stdout = stdout
-            self.stderr = stderr
-            self.returncode = returncode
-
-        def check_returncode(self):
-            if self.returncode != 0:
-                raise subprocess.CalledProcessError(
-                    self.returncode, "tmux", output=self.stdout, stderr=self.stderr
-                )
-    return _Result("\n".join(lines))
 
 
 class TestGetTree:
@@ -146,25 +97,42 @@ class TestGetTree:
 
 class TestNavigateTo:
     def test_existing(self):
-        c = _client_with([])
-        assert c.navigate_to("%0") is True
-        c.server.cmd.assert_called_with("switch-client", "-t", "%0")
+        mock_server = MagicMock()
+        with patch("muxpilot.tmux_client.libtmux.Server", return_value=mock_server):
+            c = TmuxClient()
+            assert c.navigate_to("%0") is True
+        mock_server.cmd.assert_called_once_with("switch-client", "-t", "%0")
 
     def test_nonexistent(self):
         import libtmux.exc
-        c = _client_with([])
-        c.server.cmd.side_effect = libtmux.exc.LibTmuxException("not found")
-        assert c.navigate_to("%99") is False
+        mock_server = MagicMock()
+        mock_server.cmd.side_effect = libtmux.exc.LibTmuxException("not found")
+        with patch("muxpilot.tmux_client.libtmux.Server", return_value=mock_server):
+            c = TmuxClient()
+            assert c.navigate_to("%99") is False
+
+
+class TestKillPane:
+    def test_success(self):
+        with patch("muxpilot.tmux_client.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            c = TmuxClient()
+            assert c.kill_pane("%0") is True
+        mock_run.assert_called_once_with(
+            ["tmux", "kill-pane", "-t", "%0"],
+            capture_output=True,
+            check=True,
+            timeout=5.0,
+        )
+
+    def test_failure(self):
+        with patch("muxpilot.tmux_client.subprocess.run", side_effect=subprocess.CalledProcessError(1, "tmux")):
+            c = TmuxClient()
+            assert c.kill_pane("%99") is False
 
 
 class TestCapture:
     def test_returns_list(self):
-        with patch("muxpilot.tmux_client.subprocess.run", return_value=_list_panes_output(["a", "b"])):
-            c = TmuxClient()
-            assert c.capture_pane_content("%0") == ["a", "b"]
-
-    def test_returns_string(self):
-        """tmux capture-pane -p returns stdout as a single string."""
         with patch("muxpilot.tmux_client.subprocess.run", return_value=_list_panes_output(["a", "b"])):
             c = TmuxClient()
             assert c.capture_pane_content("%0") == ["a", "b"]
@@ -191,82 +159,6 @@ class TestCapture:
         )
 
 
-class TestHelpers:
-    def test_attached_true(self):
-        s = MagicMock(); s.session_attached = "1"
-        assert _is_attached(s) is True
-
-    def test_attached_false(self):
-        s = MagicMock(); s.session_attached = "0"
-        assert _is_attached(s) is False
-
-    def test_attached_none(self):
-        s = MagicMock(); s.session_attached = None
-        assert _is_attached(s) is False
-
-    def test_attached_invalid(self):
-        s = MagicMock(); s.session_attached = "abc"
-        assert _is_attached(s) is False
-
-    def test_active_window(self):
-        w = MagicMock(); w.window_active = "1"
-        assert _is_active_window(w) is True
-
-    def test_active_pane(self):
-        p = MagicMock(); p.pane_active = "1"
-        assert _is_active_pane(p) is True
-
-
-class TestGetFullCommand:
-    def test_child_process(self):
-        """When shell has a child process, return child's cmdline."""
-        p = _mock_pane(cmd="bash", pid="1234")
-        c = _client_with([])
-
-        mock_child = MagicMock()
-        mock_child.cmdline.return_value = ["python", "script.py", "--help"]
-        mock_proc = MagicMock()
-        mock_proc.children.return_value = [mock_child]
-        mock_proc.cmdline.return_value = ["bash"]
-
-        with patch("muxpilot.tmux_client.psutil.Process", return_value=mock_proc):
-            result = c._get_full_command(p)
-        assert result == "python script.py --help"
-
-    def test_no_child_process(self):
-        """When no child process, return the shell's own cmdline."""
-        p = _mock_pane(cmd="bash", pid="1234")
-        c = _client_with([])
-
-        mock_proc = MagicMock()
-        mock_proc.children.return_value = []
-        mock_proc.cmdline.return_value = ["bash", "-l"]
-
-        with patch("muxpilot.tmux_client.psutil.Process", return_value=mock_proc):
-            result = c._get_full_command(p)
-        assert result == "bash -l"
-
-    def test_process_not_found(self):
-        """Fallback to pane_current_command when process is gone."""
-        import psutil
-        p = _mock_pane(cmd="bash", pid="1234")
-        c = _client_with([])
-
-        with patch("muxpilot.tmux_client.psutil.Process", side_effect=psutil.NoSuchProcess(1234)):
-            result = c._get_full_command(p)
-        assert result == "bash"
-
-    def test_access_denied(self):
-        """Fallback to pane_current_command on permission error."""
-        import psutil
-        p = _mock_pane(cmd="bash", pid="1234")
-        c = _client_with([])
-
-        with patch("muxpilot.tmux_client.psutil.Process", side_effect=psutil.AccessDenied(1234)):
-            result = c._get_full_command(p)
-        assert result == "bash"
-
-
 class TestPaneTitleAndGit:
     def test_get_tree_reads_pane_title(self):
         line = "s\t$1\t1\t@1\tw\t0\t1\t%1\t0\tbash\t/home/user\t1\t80\t24\t1234\tagent-1"
@@ -288,7 +180,7 @@ class TestPaneTitleAndGit:
         assert pane.branch == "main"
 
     def test_get_git_info_success(self):
-        c = _client_with([])
+        c = TmuxClient()
         with patch("muxpilot.tmux_client.subprocess.run") as mock_run:
             mock_run.side_effect = [
                 MagicMock(stdout="/home/user/proj\n", returncode=0),
@@ -298,21 +190,24 @@ class TestPaneTitleAndGit:
         assert result == {"repo_name": "proj", "branch": "feature/x"}
 
     def test_get_git_info_not_a_repo(self):
-        import subprocess
-        c = _client_with([])
+        c = TmuxClient()
         with patch("muxpilot.tmux_client.subprocess.run", side_effect=subprocess.CalledProcessError(128, "git")):
             result = c._get_git_info("/tmp")
         assert result == {"repo_name": "", "branch": ""}
 
     def test_set_pane_title_calls_tmux(self):
-        c = _client_with([])
-        result = c.set_pane_title("%1", "new-title")
-        c.server.cmd.assert_called_once_with("select-pane", "-t", "%1", "-T", "new-title")
+        mock_server = MagicMock()
+        with patch("muxpilot.tmux_client.libtmux.Server", return_value=mock_server):
+            c = TmuxClient()
+            result = c.set_pane_title("%1", "new-title")
+        mock_server.cmd.assert_called_once_with("select-pane", "-t", "%1", "-T", "new-title")
         assert result is True
 
     def test_set_pane_title_failure(self):
         import libtmux.exc
-        c = _client_with([])
-        c.server.cmd.side_effect = libtmux.exc.LibTmuxException("fail")
-        result = c.set_pane_title("%1", "new-title")
+        mock_server = MagicMock()
+        mock_server.cmd.side_effect = libtmux.exc.LibTmuxException("fail")
+        with patch("muxpilot.tmux_client.libtmux.Server", return_value=mock_server):
+            c = TmuxClient()
+            result = c.set_pane_title("%1", "new-title")
         assert result is False
