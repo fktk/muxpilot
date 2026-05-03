@@ -68,7 +68,7 @@ class TimerCoordinator:
     def start(self) -> None:
         """Start the periodic polling timer."""
         self._poll_timer = self._set_interval(
-            self._watcher.poll_interval, self._on_tick_wrapper, repeat=True
+            self._watcher.poll_interval, self._on_tick_wrapper
         )
 
     def stop(self) -> None:
@@ -109,7 +109,7 @@ class TimerCoordinator:
             if self._retry_timer is not None:
                 self._retry_timer.stop()
             self._retry_timer = self._set_interval(
-                self._backoff, self._on_tick_wrapper, repeat=False
+                self._backoff, self._on_tick_wrapper
             )
             return None
 
@@ -117,6 +117,8 @@ class TimerCoordinator:
         self._backoff = self._watcher.poll_interval
         if self._poll_timer is not None:
             self._poll_timer.resume()
+        if self._retry_timer is not None:
+            self._retry_timer.stop()
         return tree, events
 
     async def _on_tick_wrapper(self) -> None:
