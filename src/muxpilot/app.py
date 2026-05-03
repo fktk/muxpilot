@@ -110,7 +110,10 @@ class MuxpilotApp(App[str | None]):
         self._filter_state = FilterState()
         self._rename_controller = RenameController(self._client)
         self._polling = PollingController(
-            self, self._watcher_instance, self._notify_channel_instance
+            watcher=self._watcher_instance,
+            on_tick=self._handle_poll_result,
+            notify_channel=self._notify_channel_instance,
+            set_interval=self.set_interval,
         )
         self.theme = self._label_store_instance.get_theme()
 
@@ -124,7 +127,10 @@ class MuxpilotApp(App[str | None]):
         self._watcher_instance = value
         if hasattr(self, "_polling"):
             self._polling = PollingController(
-                self, value, self._notify_channel_instance
+                watcher=value,
+                on_tick=self._handle_poll_result,
+                notify_channel=self._notify_channel_instance,
+                set_interval=self.set_interval,
             )
 
     @property
@@ -136,7 +142,10 @@ class MuxpilotApp(App[str | None]):
         self._notify_channel_instance = value
         if hasattr(self, "_polling"):
             self._polling = PollingController(
-                self, self._watcher_instance, value
+                watcher=self._watcher_instance,
+                on_tick=self._handle_poll_result,
+                notify_channel=value,
+                set_interval=self.set_interval,
             )
 
     @property
@@ -154,7 +163,7 @@ class MuxpilotApp(App[str | None]):
 
     @_status_filter.setter
     def _status_filter(self, value: set[PaneStatus] | None) -> None:
-        self._filter_state.status_filter = value
+        self._filter_state = self._filter_state.with_status(value)
 
     @property
     def _name_filter(self) -> str:
@@ -162,7 +171,7 @@ class MuxpilotApp(App[str | None]):
 
     @_name_filter.setter
     def _name_filter(self, value: str) -> None:
-        self._filter_state.name_filter = value
+        self._filter_state = self._filter_state.with_name(value)
 
     @property
     def _rename_key(self) -> str | None:
@@ -254,12 +263,12 @@ class MuxpilotApp(App[str | None]):
 
         await self._update_ui_from_poll(tree, events, rebuild_tree=True)
 
+    async def _handle_poll_result(self, tree: TmuxTree, events: list[TmuxEvent]) -> None:
+        """Callback passed to TimerCoordinator for each successful poll."""
+        await self._update_ui_from_poll(tree, events, rebuild_tree=True)
+
     async def _poll_tmux(self) -> None:
         """Backward-compatible alias for the periodic polling callback."""
-        await self._on_poll_tick()
-
-    async def _on_poll_tick(self) -> None:
-        """Periodic polling callback — delegates to PollingController."""
         result = await self._polling.tick()
         if result is None:
             return
@@ -364,7 +373,7 @@ class MuxpilotApp(App[str | None]):
 
     async def action_filter_all(self) -> None:
         """Clear all filters (a key)."""
-        self._filter_state.clear_all()
+        self._filter_state = self._filter_state.cleared()
         filter_input = self.query_one("#filter-input", Input)
         filter_input.value = ""
         filter_input.remove_class("-active")

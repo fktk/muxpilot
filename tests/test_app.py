@@ -1150,11 +1150,12 @@ async def test_poll_tmux_pauses_timer_on_exception():
     async with app.run_test() as pilot:
         app._poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
-        with patch.object(app, "set_interval") as mock_set_interval:
-            await app._poll_tmux()
+        mock_set_interval = MagicMock()
+        app._polling._set_interval = mock_set_interval
+        await app._poll_tmux()
         app._poll_timer.pause.assert_called_once()
         mock_set_interval.assert_called_once_with(
-            DEFAULT_POLL_INTERVAL * 2, app._poll_tmux, repeat=False
+            DEFAULT_POLL_INTERVAL * 2, app._polling._on_tick_wrapper, repeat=False
         )
 
 
@@ -1169,11 +1170,11 @@ async def test_poll_tmux_backoff_doubles_after_failure():
         app._poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
         assert app._poll_backoff == DEFAULT_POLL_INTERVAL
-        with patch.object(app, "set_interval"):
-            await app._poll_tmux()
+        app._polling._set_interval = MagicMock()
+        await app._poll_tmux()
         assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 2
-        with patch.object(app, "set_interval"):
-            await app._poll_tmux()
+        app._polling._set_interval = MagicMock()
+        await app._poll_tmux()
         assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 4
 
 
@@ -1189,18 +1190,20 @@ async def test_poll_tmux_backoff_caps_at_max():
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
         # Seed backoff so next doubling would exceed the cap
         app._poll_backoff = MAX_POLL_BACKOFF_SECONDS - 1.0
-        with patch.object(app, "set_interval") as mock_set_interval:
-            await app._poll_tmux()
+        mock_set_interval = MagicMock()
+        app._polling._set_interval = mock_set_interval
+        await app._poll_tmux()
         assert app._poll_backoff == MAX_POLL_BACKOFF_SECONDS
         mock_set_interval.assert_called_once_with(
-            MAX_POLL_BACKOFF_SECONDS, app._poll_tmux, repeat=False
+            MAX_POLL_BACKOFF_SECONDS, app._polling._on_tick_wrapper, repeat=False
         )
         # Another failure should stay at the cap
-        with patch.object(app, "set_interval") as mock_set_interval:
-            await app._poll_tmux()
+        mock_set_interval = MagicMock()
+        app._polling._set_interval = mock_set_interval
+        await app._poll_tmux()
         assert app._poll_backoff == MAX_POLL_BACKOFF_SECONDS
         mock_set_interval.assert_called_once_with(
-            MAX_POLL_BACKOFF_SECONDS, app._poll_tmux, repeat=False
+            MAX_POLL_BACKOFF_SECONDS, app._polling._on_tick_wrapper, repeat=False
         )
 
 
