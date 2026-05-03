@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Awaitable
 
 from muxpilot.models import TmuxEvent, TmuxTree
+from muxpilot.notify_channel import NotifyChannel
 from muxpilot.watcher import TmuxWatcher
 
 
@@ -25,9 +26,9 @@ class TimerCoordinator:
     def __init__(
         self,
         watcher: TmuxWatcher,
-        on_tick: Callable[[TmuxTree, list[TmuxEvent]], Any],
-        notify_channel,
-        set_interval: Callable[..., Any],
+        on_tick: Callable[[TmuxTree, list[TmuxEvent]], Awaitable[Any]],
+        notify_channel: NotifyChannel,
+        set_interval: Callable[[float, Callable[..., Any], bool], Any],
     ) -> None:
         self._watcher = watcher
         self._on_tick = on_tick
@@ -53,15 +54,15 @@ class TimerCoordinator:
         return self._poll_timer
 
     @poll_timer.setter
-    def poll_timer(self, value) -> None:
+    def poll_timer(self, value: Any) -> None:
         self._poll_timer = value
 
     @property
-    def retry_timer(self):
+    def retry_timer(self) -> Any:
         return self._retry_timer
 
     @retry_timer.setter
-    def retry_timer(self, value) -> None:
+    def retry_timer(self, value: Any) -> None:
         self._retry_timer = value
 
     def start(self) -> None:

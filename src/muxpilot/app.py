@@ -123,7 +123,7 @@ class MuxpilotApp(App[str | None]):
         return self._watcher_instance
 
     @_watcher.setter
-    def _watcher(self, value) -> None:
+    def _watcher(self, value: TmuxWatcher) -> None:
         self._watcher_instance = value
         if hasattr(self, "_polling"):
             self._polling = TimerCoordinator(
@@ -138,7 +138,7 @@ class MuxpilotApp(App[str | None]):
         return self._notify_channel_instance
 
     @_notify_channel.setter
-    def _notify_channel(self, value) -> None:
+    def _notify_channel(self, value: NotifyChannel) -> None:
         self._notify_channel_instance = value
         if hasattr(self, "_polling"):
             self._polling = TimerCoordinator(
@@ -153,7 +153,7 @@ class MuxpilotApp(App[str | None]):
         return self._label_store_instance
 
     @_label_store.setter
-    def _label_store(self, value) -> None:
+    def _label_store(self, value: LabelStore) -> None:
         self._label_store_instance = value
 
 
