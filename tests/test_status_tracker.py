@@ -62,3 +62,28 @@ class TestStatusTracker:
         first.status_override = PaneStatus.WAITING_INPUT
         second = tracker.analyze_pane("%0", ["hello"], first, 1.0)
         assert second.status_override == PaneStatus.WAITING_INPUT
+
+    def test_logs_content_changed(self, tracker, caplog):
+        """Should log content hash and content_changed flag."""
+        with caplog.at_level("DEBUG", logger="muxpilot.status_tracker"):
+            tracker.analyze_pane("%0", ["hello"], None, 0.0)
+        assert "%0" in caplog.text
+        assert "content_changed=True" in caplog.text
+        assert "hash=" in caplog.text
+
+    def test_logs_status_override_cleared(self, tracker, caplog):
+        """Should log when status_override is cleared due to content change."""
+        first = tracker.analyze_pane("%0", ["hello"], None, 0.0)
+        first.status_override = PaneStatus.WAITING_INPUT
+        with caplog.at_level("DEBUG", logger="muxpilot.status_tracker"):
+            tracker.analyze_pane("%0", ["world"], first, 0.0)
+        assert "status_override cleared" in caplog.text
+        assert "%0" in caplog.text
+
+    def test_logs_idle_seconds(self, tracker, caplog):
+        """Should log idle_seconds calculation."""
+        first = tracker.analyze_pane("%0", ["hello"], None, 0.0)
+        with caplog.at_level("DEBUG", logger="muxpilot.status_tracker"):
+            second = tracker.analyze_pane("%0", ["hello"], first, 2.5)
+        assert "idle_seconds=2.5" in caplog.text
+        assert "%0" in caplog.text

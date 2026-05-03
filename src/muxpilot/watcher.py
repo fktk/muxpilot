@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import pathlib
 import re
 import time
@@ -17,6 +18,8 @@ from muxpilot.pattern_matcher import PatternMatcher
 from muxpilot.status_tracker import StatusTracker
 from muxpilot.structural_detector import StructuralChangeDetector
 from muxpilot.tmux_client import TmuxClient
+
+logger = logging.getLogger(__name__)
 
 
 # Default patterns for status detection
@@ -144,6 +147,7 @@ class TmuxWatcher:
         3. Capture pane output and detect status changes
         4. Return updated tree and events
         """
+        logger.debug("poll start")
         new_tree = self.client.get_tree()
         events: list[TmuxEvent] = []
 
@@ -176,11 +180,23 @@ class TmuxWatcher:
             )
             # If status_override is set, use it instead of the auto-determined status
             if new_activity.status_override is not None:
+                logger.debug(
+                    "poll pane=%s status_override=%s → %s",
+                    pane.pane_id,
+                    new_status.value,
+                    new_activity.status_override.value,
+                )
                 new_status = new_activity.status_override
             new_activity.status = new_status
 
             # Check for status change
             if old_activity and old_activity.status != new_activity.status:
+                logger.debug(
+                    "poll pane=%s status changed %s → %s",
+                    pane.pane_id,
+                    old_activity.status.value,
+                    new_activity.status.value,
+                )
                 events.append(
                     TmuxEvent(
                         event_type="status_changed",
@@ -201,6 +217,7 @@ class TmuxWatcher:
 
         self._last_tree = new_tree
         self._last_poll_time = now
+        logger.debug("poll end events=%d", len(events))
         return new_tree, events
 
     def process_notification(self, message: str) -> TmuxEvent | None:
@@ -208,26 +225,37 @@ class TmuxWatcher:
 
         Returns a TmuxEvent when both pane id and pattern are found, or None if no match.
         """
+        logger.debug("process_notification message=%r", message)
+
         if self.waiting_trigger_pattern is None:
+            logger.debug("process_notification skipped: no waiting_trigger_pattern")
             return None
 
         # Find first pane id token
         pane_match = re.search(r"%[0-9]+", message)
         if not pane_match:
+            logger.debug("process_notification skipped: no pane_id found")
             return None
         pane_id = pane_match.group(0)
 
         # Check pattern match
         if not self.waiting_trigger_pattern.search(message):
+            logger.debug("process_notification skipped: pattern did not match")
             return None
 
         activity = self._tracker.activities.get(pane_id)
         if activity is None:
+            logger.debug("process_notification skipped: unknown pane %s", pane_id)
             return None
 
         old_status = activity.status
         activity.status = PaneStatus.WAITING_INPUT
         activity.status_override = PaneStatus.WAITING_INPUT
+        logger.debug(
+            "process_notification pane=%s status=%s → WAITING_INPUT (override set)",
+            pane_id,
+            old_status.value,
+        )
 
         return TmuxEvent(
             event_type="status_changed",

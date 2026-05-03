@@ -16,6 +16,7 @@ from muxpilot.app_actions import ActionHandler
 from muxpilot.app_ui import UIOrchestrator
 from muxpilot.controllers import FilterState, PaneTitleManager
 from muxpilot.label_store import LabelStore
+from muxpilot.logging_config import setup_logging
 from muxpilot.timer_coordinator import TimerCoordinator
 from muxpilot.notify_channel import NotifyChannel
 from muxpilot.tmux_client import TmuxClient
@@ -285,6 +286,7 @@ class MuxpilotApp(App[str | None]):
 
 def main() -> None:
     """Entry point for the muxpilot CLI."""
+    setup_logging()
     client = TmuxClient()
     if not client.is_inside_tmux():
         session_name = "muxpilot"

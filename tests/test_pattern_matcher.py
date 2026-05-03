@@ -107,3 +107,52 @@ class TestPatternMatcher:
     def test_only_whitespace_lines(self, matcher):
         lines = ["   ", "  ", ""]
         assert matcher.determine_status(lines, "", idle=0.0, old_status=PaneStatus.ACTIVE, content_changed=True) == PaneStatus.ACTIVE
+
+    def test_logs_hysteresis(self, matcher, caplog):
+        """Should log when hysteresis preserves old status."""
+        with caplog.at_level("DEBUG", logger="muxpilot.pattern_matcher"):
+            matcher.determine_status(
+                ["$ "], "$ ", idle=60.0,
+                old_status=PaneStatus.WAITING_INPUT, content_changed=False,
+            )
+        assert "hysteresis" in caplog.text
+        assert "waiting" in caplog.text
+
+    def test_logs_error_match(self, matcher, caplog):
+        """Should log when error pattern matches."""
+        with caplog.at_level("DEBUG", logger="muxpilot.pattern_matcher"):
+            matcher.determine_status(
+                ["Error: fail"], "Error: fail", idle=0.0,
+                old_status=PaneStatus.ACTIVE, content_changed=True,
+            )
+        assert "error pattern matched" in caplog.text
+        assert "ERROR" in caplog.text
+
+    def test_logs_waiting_match(self, matcher, caplog):
+        """Should log when prompt pattern matches."""
+        with caplog.at_level("DEBUG", logger="muxpilot.pattern_matcher"):
+            matcher.determine_status(
+                ["$ "], "$ ", idle=0.0,
+                old_status=PaneStatus.ACTIVE, content_changed=True,
+            )
+        assert "prompt pattern matched" in caplog.text
+        assert "WAITING_INPUT" in caplog.text
+
+    def test_logs_idle_transition(self, matcher, caplog):
+        """Should log when idle threshold is reached."""
+        with caplog.at_level("DEBUG", logger="muxpilot.pattern_matcher"):
+            matcher.determine_status(
+                ["out"], "out", idle=15.0,
+                old_status=PaneStatus.ACTIVE, content_changed=True,
+            )
+        assert "idle threshold reached" in caplog.text
+        assert "IDLE" in caplog.text
+
+    def test_logs_active_fallback(self, matcher, caplog):
+        """Should log when falling back to ACTIVE."""
+        with caplog.at_level("DEBUG", logger="muxpilot.pattern_matcher"):
+            matcher.determine_status(
+                ["out"], "out", idle=0.0,
+                old_status=PaneStatus.ACTIVE, content_changed=True,
+            )
+        assert "fallback to ACTIVE" in caplog.text

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 
 from muxpilot.models import PaneActivity, PaneStatus
+
+logger = logging.getLogger(__name__)
 
 
 class StatusTracker:
@@ -29,13 +32,26 @@ class StatusTracker:
 
         content_changed = not (old_activity and old_activity.last_content_hash == content_hash)
 
+        logger.debug(
+            "analyze_pane pane=%s hash=%s content_changed=%s",
+            pane_id,
+            content_hash[:8],
+            content_changed,
+        )
+
         if old_activity and not content_changed:
             idle_seconds = old_activity.idle_seconds + poll_elapsed
         else:
             idle_seconds = 0.0
 
+        logger.debug("analyze_pane pane=%s idle_seconds=%.2f", pane_id, idle_seconds)
+
         status_override = old_activity.status_override if old_activity else None
         if content_changed and status_override is not None:
+            logger.debug(
+                "analyze_pane pane=%s status_override cleared (content_changed)",
+                pane_id,
+            )
             status_override = None
 
         activity = PaneActivity(

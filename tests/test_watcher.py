@@ -227,3 +227,20 @@ class TestProcessNotification:
 
         # status_override is cleared because content changed, but prompt pattern keeps it WAITING
         assert w.activities["%0"].status is PaneStatus.WAITING_INPUT
+
+    def test_poll_logs_pane_status(self, caplog):
+        """Should log poll start/end."""
+        w = self._watcher_with_pattern()
+        with caplog.at_level("DEBUG", logger="muxpilot.watcher"):
+            w.poll()
+        assert "poll start" in caplog.text
+        assert "poll end" in caplog.text
+
+    def test_process_notification_logs_match(self, caplog):
+        """Should log notification processing."""
+        w = self._watcher_with_pattern()
+        with caplog.at_level("DEBUG", logger="muxpilot.watcher"):
+            w.process_notification("%0 WAITING")
+        assert "process_notification" in caplog.text
+        assert "%0" in caplog.text
+        assert "override set" in caplog.text

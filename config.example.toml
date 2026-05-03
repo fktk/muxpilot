@@ -53,3 +53,9 @@ poll_errors = true
 # The notification message must contain both a pane id (e.g. %1) and
 # a match for this pattern. Leave empty to disable.
 # waiting_trigger_pattern = "WAITING"
+
+[logging]
+# Log level for the muxpilot log file (~/.config/muxpilot/muxpilot.log).
+# Supported values: "DEBUG", "INFO", "WARNING", "ERROR"
+# Default: "INFO"
+level = "INFO"
