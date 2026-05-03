@@ -5,9 +5,8 @@ from __future__ import annotations
 import pathlib
 import re
 
-import pytest
 
-from muxpilot.models import PaneActivity, PaneStatus, TmuxTree
+from muxpilot.models import PaneStatus
 from muxpilot.watcher import TmuxWatcher
 
 from conftest import make_mock_client, make_pane, make_session, make_tree, make_window

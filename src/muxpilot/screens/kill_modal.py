@@ -4,7 +4,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Static
+from textual.widgets import Button, Static
 
 
 class KillPaneModalScreen(ModalScreen[bool]):

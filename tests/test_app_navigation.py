@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from muxpilot.models import PaneStatus
 from muxpilot.widgets.tree_view import TmuxTreeView
 
 from _test_app_common import _patched_app
@@ -169,7 +168,6 @@ async def test_cursor_preserved_after_repopulate():
         assert cursor_after != tw.root, "Cursor was reset to root after repopulate"
         # The cursor path (pane id) must match
         if cursor_before is not None:
-            before_data = tw._node_data.get(cursor_before.id if cursor_before in [tw.root] else cursor_after.id)
             # Verify cursor is on the same path as before repopulate
             before_path = tw._get_node_path(cursor_before) if cursor_before else None
             after_path = tw._get_node_path(cursor_after) if cursor_after else None

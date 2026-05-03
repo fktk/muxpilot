@@ -11,12 +11,12 @@ import sys
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Header, Static, Input
+from textual.widgets import Footer, Header, Input
 
 from muxpilot.controllers import FilterState, PaneTitleManager
 from muxpilot.label_store import LabelStore
 from muxpilot.timer_coordinator import TimerCoordinator
-from muxpilot.models import PaneInfo, PaneStatus, SessionInfo, TmuxTree, WindowInfo
+from muxpilot.models import PaneInfo, SessionInfo, TmuxEvent, TmuxTree, WindowInfo
 from muxpilot.notify_channel import NotifyChannel
 from muxpilot.screens.help_screen import HelpScreen
 from muxpilot.screens.kill_modal import KillPaneModalScreen
@@ -27,7 +27,6 @@ from muxpilot.widgets.filter_bar import FilterBar
 from muxpilot.widgets.tree_view import TmuxTreeView
 
 
-MAX_POLL_BACKOFF_SECONDS = 30.0
 NOTIFY_CHECK_INTERVAL = 0.5
 
 
@@ -382,7 +381,7 @@ class MuxpilotApp(App[str | None]):
 
         def on_result(confirmed: bool | None) -> None:
             if confirmed:
-                success = self._client.kill_pane(pane.pane_id)
+                self._client.kill_pane(pane.pane_id)
                 self._polling.trigger_cooldown()
                 asyncio.create_task(self._do_refresh())
 

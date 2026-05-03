@@ -38,7 +38,6 @@ async def test_help_screen_bindings_match_actual():
         await pilot.pause()
         table = screen.query_one("#help-content")
         keys = [str(table.get_cell_at((row, 0))) for row in range(table.row_count)]
-        actions = [str(table.get_cell_at((row, 1))) for row in range(table.row_count)]
 
         # Keys that should NOT appear in help (not bound in app)
         for key_cell in keys:

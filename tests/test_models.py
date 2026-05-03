@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from unittest.mock import patch
 
 import pytest
 
@@ -11,9 +10,7 @@ from muxpilot.models import (
     PaneInfo,
     PaneStatus,
     STATUS_ICONS,
-    SessionInfo,
     TmuxTree,
-    WindowInfo,
     _shorten_path,
 )
 
@@ -124,7 +121,6 @@ class TestPaneInfoDisplayLabel:
 
     def test_pane_label_uses_shortened_path(self) -> None:
         """Pane label should use a shortened path and concise command."""
-        from muxpilot.models import PaneInfo
         p = PaneInfo(
             pane_id="%0", pane_index=0,
             current_command="zsh", current_path="/home/user/projects/muxpilot/src",

@@ -6,7 +6,6 @@ import os
 import subprocess
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from muxpilot.tmux_client import TmuxClient
 

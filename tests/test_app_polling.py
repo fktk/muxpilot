@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from muxpilot.app import MAX_POLL_BACKOFF_SECONDS
+from muxpilot.timer_coordinator import MAX_POLL_BACKOFF_SECONDS
 from muxpilot.models import PaneStatus
 from muxpilot.watcher import DEFAULT_POLL_INTERVAL
 from muxpilot.widgets.tree_view import TmuxTreeView
@@ -24,7 +24,7 @@ async def test_status_changed_events_not_notified():
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
     ])
     app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
+    async with app.run_test():
         # Simulate a status_changed event arriving via _do_refresh
         status_event = TmuxEvent(
             event_type="status_changed",
@@ -37,7 +37,6 @@ async def test_status_changed_events_not_notified():
         app._notify_channel.send.reset_mock()
 
         # Simulate _poll_tmux delivering a status_changed event
-        from muxpilot.watcher import TmuxWatcher
         with patch.object(app._watcher, "poll", return_value=(tree, [status_event])):
             await app._poll_tmux()
 
@@ -57,7 +56,7 @@ async def test_structural_events_not_notified():
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
     ])
     app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._notify_channel.send.reset_mock()
 
         structural_event = TmuxEvent(
@@ -65,7 +64,6 @@ async def test_structural_events_not_notified():
             pane_id="%1",
             message="Pane added: %1",
         )
-        from muxpilot.watcher import TmuxWatcher
         with patch.object(app._watcher, "poll", return_value=(tree, [structural_event])):
             await app._poll_tmux()
 
@@ -87,7 +85,7 @@ async def test_poll_tmux_shows_error_on_exception():
     ])
     app = _patched_app(tree=tree)
     app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._notify_channel.send.reset_mock()
         await app._poll_tmux()
         messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
@@ -102,7 +100,7 @@ async def test_poll_tmux_suppresses_error_when_notify_disabled():
     ])
     app = _patched_app(tree=tree)
     app._watcher.notify_poll_errors = False
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._notify_channel.send.reset_mock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
         await app._poll_tmux()
@@ -117,7 +115,7 @@ async def test_poll_tmux_pauses_timer_on_exception():
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
     ])
     app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._polling.poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
         mock_set_interval = MagicMock()
@@ -136,7 +134,7 @@ async def test_poll_tmux_backoff_doubles_after_failure():
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
     ])
     app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._polling.poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
         assert app._polling.backoff == DEFAULT_POLL_INTERVAL
@@ -155,7 +153,7 @@ async def test_poll_tmux_backoff_caps_at_max():
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
     ])
     app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._polling.poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
         # Seed backoff so next doubling would exceed the cap
@@ -184,7 +182,7 @@ async def test_poll_tmux_resumes_timer_on_recovery():
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
     ])
     app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._polling.poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=[RuntimeError("tmux down"), (tree, [])])
         with patch.object(app, "set_interval"):
@@ -221,7 +219,7 @@ async def test_poll_retry_limit_stops_polling():
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
     ])
     app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
+    async with app.run_test():
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
         app._polling.poll_timer = MagicMock()
         app._polling.max_consecutive_failures = 3

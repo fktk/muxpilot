@@ -8,8 +8,6 @@ import pytest
 
 from unittest.mock import MagicMock
 
-from muxpilot.app import MuxpilotApp, main
-from muxpilot.models import PaneStatus
 from muxpilot.screens.help_screen import HelpScreen
 from muxpilot.widgets.tree_view import TmuxTreeView
 

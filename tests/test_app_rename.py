@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import pathlib
 
 import pytest
 
-from muxpilot.models import PaneStatus
 from muxpilot.label_store import LabelStore
 from muxpilot.widgets.tree_view import TmuxTreeView
 
@@ -18,7 +16,6 @@ from conftest import make_pane, make_session, make_tree, make_window
 async def test_rename_key_shows_input(tmp_path):
     """Pressing n should show the rename input."""
     from textual.widgets import Input
-    from muxpilot.label_store import LabelStore
 
     tree = make_tree(sessions=[
         make_session(session_name="work", windows=[

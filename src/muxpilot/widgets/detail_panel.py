@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
 from textual.widget import Widget
-from textual.widgets import Markdown, Static
+from textual.widgets import Markdown
 
 from muxpilot.models import (
     PaneInfo,
@@ -83,8 +82,8 @@ class DetailPanel(Widget):
             text += "\n> **Waiting for input**\n"
 
         text += (
-            f"\n## Recent Output\n\n"
-            f"```\n"
+            "\n## Recent Output\n\n"
+            "```\n"
         )
         preview = pane.recent_lines if pane.recent_lines else ["(no output)"]
         for line in preview:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from muxpilot.models import PaneStatus, _shorten_path
+from muxpilot.models import PaneStatus
 from muxpilot.widgets.detail_panel import DetailPanel
 from muxpilot.widgets.tree_view import TmuxTreeView
 
@@ -27,7 +27,6 @@ def _run_detail_panel(panel):
 @pytest.mark.asyncio
 async def test_detail_panel_shows_pane_title_and_git():
     """Detail panel should display pane title, repo, branch, and idle time."""
-    from muxpilot.widgets.detail_panel import DetailPanel
     panel = DetailPanel()
     session = make_session(session_name="dev", windows=[
         make_window(window_name="editor", panes=[
@@ -59,7 +58,6 @@ async def test_detail_panel_shows_pane_title_and_git():
 @pytest.mark.asyncio
 async def test_detail_panel_error_status_shows_clean_icon():
     """Detail panel should render ERROR status icon cleanly without broken markup."""
-    from muxpilot.widgets.detail_panel import DetailPanel
     panel = DetailPanel()
     session = make_session(session_name="dev", windows=[
         make_window(window_name="editor", panes=[
@@ -84,7 +82,6 @@ async def test_detail_panel_error_status_shows_clean_icon():
 @pytest.mark.asyncio
 async def test_detail_panel_pane_shows_session_and_window_before_title():
     """Pane details should show Session and Window before Title, and not repeat them after Recent Output."""
-    from muxpilot.widgets.detail_panel import DetailPanel
     panel = DetailPanel()
     session = make_session(session_name="my-session", windows=[
         make_window(window_name="my-window", window_index=3, panes=[
@@ -127,7 +124,6 @@ async def test_detail_panel_pane_shows_session_and_window_before_title():
 @pytest.mark.asyncio
 async def test_detail_panel_window_shows_session_first():
     """Window details should show Session before Name."""
-    from muxpilot.widgets.detail_panel import DetailPanel
     panel = DetailPanel()
     session = make_session(session_name="my-session", windows=[
         make_window(window_name="my-window", window_index=3, panes=[
@@ -154,7 +150,6 @@ async def test_detail_panel_window_shows_session_first():
 @pytest.mark.asyncio
 async def test_detail_panel_window_does_not_show_pane_count():
     """Window details should not include pane count."""
-    from muxpilot.widgets.detail_panel import DetailPanel
     panel = DetailPanel()
     session = make_session(session_name="my-session", windows=[
         make_window(window_name="my-window", window_index=3, panes=[
@@ -173,7 +168,6 @@ async def test_detail_panel_window_does_not_show_pane_count():
 @pytest.mark.asyncio
 async def test_detail_panel_session_does_not_show_counts():
     """Session details should not include window or pane counts."""
-    from muxpilot.widgets.detail_panel import DetailPanel
     panel = DetailPanel()
     session = make_session(session_name="my-session", windows=[
         make_window(window_name="w1", window_index=0, panes=[make_pane(pane_id="%0")]),
@@ -190,7 +184,6 @@ async def test_detail_panel_session_does_not_show_counts():
 @pytest.mark.asyncio
 async def test_detail_panel_updates_on_refresh_without_cursor_change():
     """After _do_refresh, DetailPanel should update even when the selected node hasn't changed."""
-    from muxpilot.widgets.detail_panel import DetailPanel
 
     tree = make_tree(sessions=[
         make_session(session_name="dev", windows=[
@@ -228,7 +221,6 @@ async def test_detail_panel_updates_on_refresh_without_cursor_change():
 async def test_detail_panel_updates_on_poll_without_events():
     """Periodic poll without status events must still refresh DetailPanel."""
     from unittest.mock import patch
-    from muxpilot.widgets.detail_panel import DetailPanel
 
     tree = make_tree(sessions=[
         make_session(session_name="dev", windows=[

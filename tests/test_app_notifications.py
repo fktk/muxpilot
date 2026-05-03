@@ -16,7 +16,6 @@ from conftest import make_pane, make_session, make_tree, make_window
 @pytest.mark.asyncio
 async def test_notification_waiting_trigger_updates_ui():
     """A FIFO message matching waiting_trigger_pattern should refresh the tree."""
-    from muxpilot.models import PaneStatus
     import re
 
     tree = make_tree(sessions=[
@@ -44,7 +43,6 @@ async def test_notification_waiting_trigger_updates_ui():
 @pytest.mark.asyncio
 async def test_notification_no_match_shows_raw_toast():
     """A FIFO message that does not match should display as a normal toast."""
-    import re
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0")])])
     ])
@@ -64,7 +62,6 @@ async def test_notification_no_match_shows_raw_toast():
 @pytest.mark.asyncio
 async def test_notification_waiting_trigger_before_first_poll():
     """A notification before first poll should update activity but not crash."""
-    from muxpilot.models import PaneStatus
     import re
 
     tree = make_tree(sessions=[

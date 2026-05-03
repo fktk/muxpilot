@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from muxpilot.structural_detector import StructuralChangeDetector
-from muxpilot.models import TmuxEvent
 
 from conftest import make_pane, make_session, make_tree, make_window
 

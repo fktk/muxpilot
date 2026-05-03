@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from muxpilot.controllers import PaneTitleManager
 from muxpilot.models import SessionInfo, WindowInfo, PaneInfo

@@ -3,7 +3,6 @@ import pathlib
 import tempfile
 
 import pytest
-from pathlib import Path
 from unittest.mock import MagicMock
 from muxpilot.watcher import TmuxWatcher
 from conftest import make_mock_client
@@ -64,7 +63,8 @@ def test_watcher_config_error_on_bad_regex():
 
 
 def test_watcher_reads_poll_interval_from_config():
-    import tempfile, pathlib
+    import tempfile
+    import pathlib
     with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
         f.write('[watcher]\npoll_interval = 0.5\n')
         path = f.name
@@ -84,7 +84,8 @@ def test_watcher_notify_poll_errors_defaults_to_true():
 
 
 def test_watcher_reads_notify_poll_errors_from_config():
-    import tempfile, pathlib
+    import tempfile
+    import pathlib
     with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
         f.write('[notifications]\npoll_errors = false\n')
         path = f.name
@@ -98,7 +99,9 @@ def test_watcher_reads_notify_poll_errors_from_config():
 
 
 def test_watcher_reads_waiting_trigger_pattern_from_config():
-    import tempfile, pathlib, os
+    import tempfile
+    import pathlib
+    import os
     with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
         f.write('[notifications]\nwaiting_trigger_pattern = "WAITING"\n')
         path = f.name

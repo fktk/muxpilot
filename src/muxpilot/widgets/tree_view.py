@@ -9,7 +9,7 @@ from textual.message import Message
 from textual.widgets import Tree
 from textual.widgets._tree import TreeNode
 
-from muxpilot.models import PaneInfo, PaneStatus, SessionInfo, STATUS_ICONS, TmuxTree, WindowInfo
+from muxpilot.models import PaneInfo, PaneStatus, SessionInfo, TmuxTree, WindowInfo
 
 # Pastel colors for the ACTIVE icon animation (no red)
 _ANIMATION_COLORS = [

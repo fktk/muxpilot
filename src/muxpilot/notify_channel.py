@@ -6,7 +6,6 @@ import asyncio
 import logging
 import os
 import queue
-import stat
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

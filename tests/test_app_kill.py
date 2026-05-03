@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from muxpilot.models import PaneStatus
 from muxpilot.screens.kill_modal import KillPaneModalScreen
 from muxpilot.widgets.tree_view import TmuxTreeView
 
@@ -17,7 +16,6 @@ from conftest import make_pane, make_session, make_tree, make_window
 @pytest.mark.asyncio
 async def test_kill_pane_key_shows_modal():
     """Pressing x on a pane node should push KillPaneModalScreen."""
-    from muxpilot.screens.kill_modal import KillPaneModalScreen
 
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%0", is_active=False)])])
@@ -138,7 +136,6 @@ async def test_kill_pane_cancel_escape():
 @pytest.mark.asyncio
 async def test_kill_pane_self_not_allowed():
     """Pressing x on the current (self) pane should not push the modal."""
-    from muxpilot.screens.kill_modal import KillPaneModalScreen
 
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[make_pane(pane_id="%5")])])

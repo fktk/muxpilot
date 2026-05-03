@@ -1,4 +1,3 @@
-import pytest
 
 from muxpilot.models import PaneStatus
 from muxpilot.widgets.tree_view import TmuxTreeView

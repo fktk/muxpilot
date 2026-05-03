@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
-from collections.abc import Callable
 from unittest.mock import MagicMock
 
 import pytest
 
 from muxpilot.timer_coordinator import TimerCoordinator
-from muxpilot.models import TmuxEvent, TmuxTree
 from muxpilot.watcher import DEFAULT_POLL_INTERVAL
 
-from conftest import make_mock_client, make_pane, make_tree, make_window
+from conftest import make_tree
 
 
 def _make_coordinator(

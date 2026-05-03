@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from muxpilot.models import (
     PaneInfo,
@@ -131,7 +130,6 @@ def make_mock_notify_channel() -> MagicMock:
 
     send() は何もしない、receive() は None を返す、start()/stop() は coroutine を返す。
     """
-    import asyncio
 
     mock = MagicMock()
     mock.send.return_value = None

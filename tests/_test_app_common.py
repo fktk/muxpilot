@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import pathlib
-from unittest.mock import MagicMock
 
 from muxpilot.app import MuxpilotApp
 from muxpilot.controllers import PaneTitleManager
-from muxpilot.notify_channel import NotifyChannel
 from muxpilot.watcher import TmuxWatcher
 
 from conftest import make_mock_client, make_mock_notify_channel

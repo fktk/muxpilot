@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
 
 from muxpilot.tree_parser import TreeParser
-from muxpilot.models import TmuxTree
 
 
 class TestTreeParser:

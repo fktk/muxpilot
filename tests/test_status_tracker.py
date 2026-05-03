@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from muxpilot.status_tracker import StatusTracker
-from muxpilot.models import PaneActivity, PaneStatus
+from muxpilot.models import PaneStatus
 
 
 class TestStatusTracker:
