@@ -348,3 +348,46 @@ class TestProcessNotification:
         assert event.old_status == PaneStatus.ERROR
         assert event.new_status == PaneStatus.WAITING_INPUT
         assert w.activities["%1"].status == PaneStatus.WAITING_INPUT
+
+    def test_status_override_set_by_notification(self):
+        """process_notification should set status_override on the activity."""
+        w = self._watcher_with_pattern()
+        w.process_notification("%0 WAITING")
+        assert w.activities["%0"].status_override == PaneStatus.WAITING_INPUT
+
+    def test_status_override_persists_across_polls_when_content_unchanged(self):
+        """If content hasn't changed, status_override should keep the pane WAITING across polls."""
+        w = self._watcher_with_pattern()
+        w.process_notification("%0 WAITING")
+        assert w.activities["%0"].status == PaneStatus.WAITING_INPUT
+
+        # Poll again with unchanged content — status_override should keep it WAITING
+        w.poll()
+        assert w.activities["%0"].status == PaneStatus.WAITING_INPUT
+
+    def test_status_override_cleared_when_content_changes(self):
+        """status_override should be cleared when pane content changes."""
+        w = self._watcher_with_pattern()
+        w.process_notification("%0 WAITING")
+        assert w.activities["%0"].status_override == PaneStatus.WAITING_INPUT
+
+        # Change pane content so it doesn't match any prompt pattern
+        w.client.capture_pane_content.return_value = ["new output line"]
+        w.poll()
+
+        # status_override should be cleared, and status should go back to ACTIVE
+        assert w.activities["%0"].status_override is None
+        assert w.activities["%0"].status == PaneStatus.ACTIVE
+
+    def test_status_override_preserved_when_prompt_pattern_matches(self):
+        """Even if content changes, if prompt pattern matches, status should stay WAITING."""
+        w = self._watcher_with_pattern()
+        w.process_notification("%0 WAITING")
+        assert w.activities["%0"].status_override == PaneStatus.WAITING_INPUT
+
+        # Change content to a prompt pattern
+        w.client.capture_pane_content.return_value = ["user@host:~$ "]
+        w.poll()
+
+        # status_override is cleared because content changed, but prompt pattern keeps it WAITING
+        assert w.activities["%0"].status is PaneStatus.WAITING_INPUT

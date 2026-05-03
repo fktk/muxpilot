@@ -146,6 +146,9 @@ class TmuxWatcher:
                 old_status,
                 new_activity.content_changed,
             )
+            # If status_override is set, use it instead of the auto-determined status
+            if new_activity.status_override is not None:
+                new_status = new_activity.status_override
             new_activity.status = new_status
 
             # Check for status change
@@ -195,6 +198,11 @@ class TmuxWatcher:
         else:
             idle_seconds = 0.0
 
+        # Preserve status_override; clear it when content changes
+        status_override = old_activity.status_override if old_activity else None
+        if content_changed and status_override is not None:
+            status_override = None
+
         return PaneActivity(
             pane_id=pane_id,
             last_content_hash=content_hash,
@@ -203,6 +211,7 @@ class TmuxWatcher:
             status=old_activity.status if old_activity else PaneStatus.ACTIVE,
             content_changed=content_changed,
             recent_lines=recent_lines,
+            status_override=status_override,
         )
 
     def _determine_status(
@@ -329,6 +338,7 @@ class TmuxWatcher:
 
         old_status = activity.status
         activity.status = PaneStatus.WAITING_INPUT
+        activity.status_override = PaneStatus.WAITING_INPUT
 
         return TmuxEvent(
             event_type="status_changed",

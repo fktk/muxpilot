@@ -155,6 +155,7 @@ class PaneActivity:
     status: PaneStatus = PaneStatus.ACTIVE
     content_changed: bool = False
     recent_lines: list[str] = field(default_factory=list)
+    status_override: PaneStatus | None = None
 
 
 @dataclass
