@@ -156,54 +156,7 @@ class MuxpilotApp(App[str | None]):
     def _label_store(self, value) -> None:
         self._label_store_instance = value
 
-    # --- backward-compatible property delegates for tests ---
-    @property
-    def _status_filter(self) -> set[PaneStatus] | None:
-        return self._filter_state.status_filter
 
-    @_status_filter.setter
-    def _status_filter(self, value: set[PaneStatus] | None) -> None:
-        self._filter_state = self._filter_state.with_status(value)
-
-    @property
-    def _name_filter(self) -> str:
-        return self._filter_state.name_filter
-
-    @_name_filter.setter
-    def _name_filter(self, value: str) -> None:
-        self._filter_state = self._filter_state.with_name(value)
-
-    @property
-    def _rename_key(self) -> str | None:
-        return self._rename_controller.key
-
-    @_rename_key.setter
-    def _rename_key(self, value: str | None) -> None:
-        self._rename_controller.key = value
-
-    @property
-    def _poll_backoff(self) -> float:
-        return self._polling.backoff
-
-    @_poll_backoff.setter
-    def _poll_backoff(self, value: float) -> None:
-        self._polling.backoff = value
-
-    @property
-    def _poll_timer(self):
-        return self._polling.poll_timer
-
-    @_poll_timer.setter
-    def _poll_timer(self, value) -> None:
-        self._polling.poll_timer = value
-
-    @property
-    def _retry_timer(self):
-        return self._polling.retry_timer
-
-    @_retry_timer.setter
-    def _retry_timer(self, value) -> None:
-        self._polling.retry_timer = value
 
     def watch_theme(self, theme: str) -> None:
         """Save theme to config when it changes."""
@@ -290,12 +243,12 @@ class MuxpilotApp(App[str | None]):
             tree_widget.populate(
                 tree,
                 current_pane_id=self._current_pane_id,
-                status_filter=self._status_filter,
-                name_filter=self._name_filter,
+                status_filter=self._filter_state.status_filter,
+                name_filter=self._filter_state.name_filter,
             )
 
             filter_bar = self.query_one("#filter-bar", FilterBar)
-            filter_bar.update(self._status_filter, self._name_filter)
+            filter_bar.update(self._filter_state.status_filter, self._filter_state.name_filter)
 
     def on_tmux_tree_view_node_info(self, message: TmuxTreeView.NodeInfo) -> None:
         """Handle node highlight → update detail panel."""
@@ -350,7 +303,7 @@ class MuxpilotApp(App[str | None]):
     async def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
         if event.input.id == "filter-input":
-            self._name_filter = event.value
+            self._filter_state = self._filter_state.with_name(event.value)
             await self._do_refresh()
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -450,7 +403,7 @@ class MuxpilotApp(App[str | None]):
         if event.key == "escape" and filter_input.has_class("-active"):
             filter_input.remove_class("-active")
             filter_input.value = ""
-            self._name_filter = ""
+            self._filter_state = self._filter_state.with_name("")
             await self._do_refresh()
             self.query_one("#tmux-tree").focus()
             event.prevent_default()
@@ -475,8 +428,8 @@ class MuxpilotApp(App[str | None]):
                     tree_widget.populate(
                         self._watcher._last_tree,
                         current_pane_id=self._current_pane_id,
-                        status_filter=self._status_filter,
-                        name_filter=self._name_filter,
+                        status_filter=self._filter_state.status_filter,
+                        name_filter=self._filter_state.name_filter,
                     )
                 self.notify(
                     f"{event.pane_id} → {event.new_status.value}", timeout=3

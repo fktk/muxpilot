@@ -493,15 +493,15 @@ async def test_filter_all_clears():
     app = _patched_app()
     async with app.run_test() as pilot:
         # Set some filter state directly
-        app._status_filter = {PaneStatus.ERROR}
+        app._filter_state = app._filter_state.with_status({PaneStatus.ERROR})
         await pilot.pause()
-        assert app._status_filter is not None
+        assert app._filter_state.status_filter is not None
 
         # Now clear everything
         await app.action_filter_all()
         await pilot.pause()
-        assert app._status_filter is None
-        assert app._name_filter == ""
+        assert app._filter_state.status_filter is None
+        assert app._filter_state.name_filter == ""
         fi = app.query_one("#filter-input", Input)
         assert not fi.has_class("-active")
 
@@ -1148,12 +1148,12 @@ async def test_poll_tmux_pauses_timer_on_exception():
     ])
     app = _patched_app(tree=tree)
     async with app.run_test() as pilot:
-        app._poll_timer = MagicMock()
+        app._polling.poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
         mock_set_interval = MagicMock()
         app._polling._set_interval = mock_set_interval
         await app._poll_tmux()
-        app._poll_timer.pause.assert_called_once()
+        app._polling.poll_timer.pause.assert_called_once()
         mock_set_interval.assert_called_once_with(
             DEFAULT_POLL_INTERVAL * 2, app._polling._on_tick_wrapper, repeat=False
         )
@@ -1167,15 +1167,15 @@ async def test_poll_tmux_backoff_doubles_after_failure():
     ])
     app = _patched_app(tree=tree)
     async with app.run_test() as pilot:
-        app._poll_timer = MagicMock()
+        app._polling.poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
-        assert app._poll_backoff == DEFAULT_POLL_INTERVAL
+        assert app._polling.backoff == DEFAULT_POLL_INTERVAL
         app._polling._set_interval = MagicMock()
         await app._poll_tmux()
-        assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 2
+        assert app._polling.backoff == DEFAULT_POLL_INTERVAL * 2
         app._polling._set_interval = MagicMock()
         await app._poll_tmux()
-        assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 4
+        assert app._polling.backoff == DEFAULT_POLL_INTERVAL * 4
 
 
 @pytest.mark.asyncio
@@ -1186,14 +1186,14 @@ async def test_poll_tmux_backoff_caps_at_max():
     ])
     app = _patched_app(tree=tree)
     async with app.run_test() as pilot:
-        app._poll_timer = MagicMock()
+        app._polling.poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
         # Seed backoff so next doubling would exceed the cap
-        app._poll_backoff = MAX_POLL_BACKOFF_SECONDS - 1.0
+        app._polling.backoff = MAX_POLL_BACKOFF_SECONDS - 1.0
         mock_set_interval = MagicMock()
         app._polling._set_interval = mock_set_interval
         await app._poll_tmux()
-        assert app._poll_backoff == MAX_POLL_BACKOFF_SECONDS
+        assert app._polling.backoff == MAX_POLL_BACKOFF_SECONDS
         mock_set_interval.assert_called_once_with(
             MAX_POLL_BACKOFF_SECONDS, app._polling._on_tick_wrapper, repeat=False
         )
@@ -1201,7 +1201,7 @@ async def test_poll_tmux_backoff_caps_at_max():
         mock_set_interval = MagicMock()
         app._polling._set_interval = mock_set_interval
         await app._poll_tmux()
-        assert app._poll_backoff == MAX_POLL_BACKOFF_SECONDS
+        assert app._polling.backoff == MAX_POLL_BACKOFF_SECONDS
         mock_set_interval.assert_called_once_with(
             MAX_POLL_BACKOFF_SECONDS, app._polling._on_tick_wrapper, repeat=False
         )
@@ -1215,15 +1215,15 @@ async def test_poll_tmux_resumes_timer_on_recovery():
     ])
     app = _patched_app(tree=tree)
     async with app.run_test() as pilot:
-        app._poll_timer = MagicMock()
+        app._polling.poll_timer = MagicMock()
         app._watcher.poll = MagicMock(side_effect=[RuntimeError("tmux down"), (tree, [])])
         with patch.object(app, "set_interval"):
             await app._poll_tmux()
-        app._poll_timer.pause.assert_called_once()
-        assert app._poll_backoff == DEFAULT_POLL_INTERVAL * 2
+        app._polling.poll_timer.pause.assert_called_once()
+        assert app._polling.backoff == DEFAULT_POLL_INTERVAL * 2
         await app._poll_tmux()
-        app._poll_timer.resume.assert_called_once()
-        assert app._poll_backoff == DEFAULT_POLL_INTERVAL
+        app._polling.poll_timer.resume.assert_called_once()
+        assert app._polling.backoff == DEFAULT_POLL_INTERVAL
 
 
 # ============================================================================
@@ -1324,14 +1324,14 @@ async def test_poll_retry_limit_stops_polling():
     app = _patched_app(tree=tree)
     async with app.run_test() as pilot:
         app._watcher.poll = MagicMock(side_effect=RuntimeError("tmux down"))
-        app._poll_timer = MagicMock()
+        app._polling.poll_timer = MagicMock()
         app._polling.max_consecutive_failures = 3
 
         for _ in range(3):
             with patch.object(app, "set_interval"):
                 await app._poll_tmux()
 
-        app._poll_timer.stop.assert_called_once()
+        app._polling.poll_timer.stop.assert_called_once()
         messages = [call.args[0] for call in app._notify_channel.send.call_args_list if call.args]
         assert any("stopped after 3 consecutive failures" in m for m in messages)
 
