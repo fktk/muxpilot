@@ -118,3 +118,24 @@ def test_watcher_waiting_trigger_pattern_defaults_to_none():
     client = make_mock_client()
     watcher = TmuxWatcher(client, config_path=pathlib.Path("/nonexistent-config"))
     assert watcher.waiting_trigger_pattern is None
+
+
+def test_watcher_notification_cooldown_defaults_to_5():
+    client = make_mock_client()
+    watcher = TmuxWatcher(client, config_path=pathlib.Path("/nonexistent-config"))
+    assert watcher.notification_cooldown == 5.0
+
+
+def test_watcher_reads_notification_cooldown_from_config():
+    import tempfile
+    import pathlib
+    import os
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+        f.write('[notifications]\nnotification_cooldown = 10.0\n')
+        path = f.name
+    client = make_mock_client()
+    try:
+        watcher = TmuxWatcher(client, config_path=pathlib.Path(path))
+        assert watcher.notification_cooldown == 10.0
+    finally:
+        os.unlink(path)

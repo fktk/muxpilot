@@ -49,6 +49,11 @@ tree_panel_max_width = 60
 # Set to false to suppress "tmux poll failed" messages during normal use.
 poll_errors = true
 
+# Cooldown period in seconds after a notification-triggered WAITING status.
+# During this period, content changes will not clear the override.
+# Default: 5.0
+# notification_cooldown = 5.0
+
 # Regex pattern that triggers WAITING_INPUT status on a pane.
 # The notification message must contain both a pane id (e.g. %1) and
 # a match for this pattern. Leave empty to disable.

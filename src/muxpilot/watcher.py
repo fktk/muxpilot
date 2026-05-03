@@ -71,6 +71,7 @@ class TmuxWatcher:
         self.preview_lines = preview_lines
         self._config_error: str | None = None
         self.notify_poll_errors: bool = True
+        self.notification_cooldown: float = DEFAULT_NOTIFICATION_COOLDOWN
 
         # Load default patterns
         prompt_patterns = list(DEFAULT_PROMPT_PATTERNS)
@@ -100,6 +101,8 @@ class TmuxWatcher:
                     notify_cfg = config.get("notifications", {})
                     if "poll_errors" in notify_cfg:
                         self.notify_poll_errors = bool(notify_cfg["poll_errors"])
+
+                    self.notification_cooldown = notify_cfg.get("notification_cooldown", self.notification_cooldown)
 
                     waiting_pattern = notify_cfg.get("waiting_trigger_pattern", "")
                     if waiting_pattern:
@@ -255,7 +258,7 @@ class TmuxWatcher:
         old_status = activity.status
         activity.status = PaneStatus.WAITING_INPUT
         activity.status_override = PaneStatus.WAITING_INPUT
-        activity.status_override_until = time.time() + DEFAULT_NOTIFICATION_COOLDOWN
+        activity.status_override_until = time.time() + self.notification_cooldown
         logger.debug(
             "process_notification pane=%s status=%s → WAITING_INPUT (override set, cooldown_until=%.1f)",
             pane_id,
