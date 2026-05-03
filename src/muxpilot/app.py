@@ -13,8 +13,9 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Static, Input
 
-from muxpilot.controllers import FilterState, PollingController, RenameController
+from muxpilot.controllers import FilterState, PaneTitleManager
 from muxpilot.label_store import LabelStore
+from muxpilot.timer_coordinator import TimerCoordinator
 from muxpilot.models import PaneInfo, PaneStatus, SessionInfo, TmuxTree, WindowInfo
 from muxpilot.notify_channel import NotifyChannel
 from muxpilot.screens.help_screen import HelpScreen
@@ -108,8 +109,8 @@ class MuxpilotApp(App[str | None]):
         self._notify_config_error()
 
         self._filter_state = FilterState()
-        self._rename_controller = RenameController(self._client)
-        self._polling = PollingController(
+        self._rename_controller = PaneTitleManager(self._client)
+        self._polling = TimerCoordinator(
             watcher=self._watcher_instance,
             on_tick=self._handle_poll_result,
             notify_channel=self._notify_channel_instance,
@@ -126,7 +127,7 @@ class MuxpilotApp(App[str | None]):
     def _watcher(self, value) -> None:
         self._watcher_instance = value
         if hasattr(self, "_polling"):
-            self._polling = PollingController(
+            self._polling = TimerCoordinator(
                 watcher=value,
                 on_tick=self._handle_poll_result,
                 notify_channel=self._notify_channel_instance,
@@ -141,7 +142,7 @@ class MuxpilotApp(App[str | None]):
     def _notify_channel(self, value) -> None:
         self._notify_channel_instance = value
         if hasattr(self, "_polling"):
-            self._polling = PollingController(
+            self._polling = TimerCoordinator(
                 watcher=self._watcher_instance,
                 on_tick=self._handle_poll_result,
                 notify_channel=value,

@@ -5,17 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from muxpilot.models import PaneStatus, TmuxTree
-from muxpilot.tmux_client import TmuxClient
-from muxpilot.timer_coordinator import (
-    DEFAULT_COOLDOWN_SECONDS,
-    DEFAULT_MAX_CONSECUTIVE_FAILURES,
-    MAX_POLL_BACKOFF_SECONDS,
-    TimerCoordinator,
-)
-
-
-# Backward-compatible alias
-PollingController = TimerCoordinator
 
 
 @dataclass(frozen=True)
@@ -93,5 +82,3 @@ class PaneTitleManager:
         pass
 
 
-# Backward-compatible alias
-RenameController = PaneTitleManager
