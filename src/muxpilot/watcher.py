@@ -68,6 +68,7 @@ class TmuxWatcher:
         # Load default patterns
         self.prompt_patterns = list(DEFAULT_PROMPT_PATTERNS)
         self.error_patterns = list(DEFAULT_ERROR_PATTERNS)
+        self.waiting_trigger_pattern: re.Pattern[str] | None = None
 
         # Override with config if present
         if config_path is None:
@@ -92,16 +93,15 @@ class TmuxWatcher:
                     notify_cfg = config.get("notifications", {})
                     if "poll_errors" in notify_cfg:
                         self.notify_poll_errors = bool(notify_cfg["poll_errors"])
+
+                    waiting_pattern = notify_cfg.get("waiting_trigger_pattern", "")
+                    if waiting_pattern:
+                        self.waiting_trigger_pattern = re.compile(waiting_pattern)
             except Exception as e:
                 self._config_error = str(e)
 
         self._last_tree: TmuxTree | None = None
         self._last_poll_time: float | None = None
-
-    @property
-    def config_error(self) -> str | None:
-        """Return the config loading error message, if any."""
-        return self._config_error
 
     @property
     def config_error(self) -> str | None:
@@ -304,3 +304,36 @@ class TmuxWatcher:
                 )
 
         return events
+
+    def process_notification(self, message: str) -> TmuxEvent | None:
+        """Parse a notification message and update pane status if it matches.
+
+        Returns a TmuxEvent when both pane id and pattern are found, or None if no match.
+        """
+        if self.waiting_trigger_pattern is None:
+            return None
+
+        # Find first pane id token
+        pane_match = re.search(r"%[0-9]+", message)
+        if not pane_match:
+            return None
+        pane_id = pane_match.group(0)
+
+        # Check pattern match
+        if not self.waiting_trigger_pattern.search(message):
+            return None
+
+        activity = self.activities.get(pane_id)
+        if activity is None:
+            return None
+
+        old_status = activity.status
+        activity.status = PaneStatus.WAITING_INPUT
+
+        return TmuxEvent(
+            event_type="status_changed",
+            pane_id=pane_id,
+            old_status=old_status,
+            new_status=PaneStatus.WAITING_INPUT,
+            message=f"{pane_id}: {old_status.value} → {PaneStatus.WAITING_INPUT.value}",
+        )

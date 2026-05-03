@@ -95,3 +95,23 @@ def test_watcher_reads_notify_poll_errors_from_config():
     finally:
         import os
         os.unlink(path)
+
+
+def test_watcher_reads_waiting_trigger_pattern_from_config():
+    import tempfile, pathlib, os
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+        f.write('[notifications]\nwaiting_trigger_pattern = "WAITING"\n')
+        path = f.name
+    client = make_mock_client()
+    try:
+        watcher = TmuxWatcher(client, config_path=pathlib.Path(path))
+        assert watcher.waiting_trigger_pattern is not None
+        assert watcher.waiting_trigger_pattern.pattern == "WAITING"
+    finally:
+        os.unlink(path)
+
+
+def test_watcher_waiting_trigger_pattern_defaults_to_none():
+    client = make_mock_client()
+    watcher = TmuxWatcher(client, config_path=pathlib.Path("/nonexistent-config"))
+    assert watcher.waiting_trigger_pattern is None
