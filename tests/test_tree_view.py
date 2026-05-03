@@ -78,3 +78,47 @@ def test_active_pane_label_animated():
     assert initial_label != new_label
 
 
+def test_new_window_is_auto_expanded():
+    """Newly added windows should be expanded automatically."""
+    tree1 = make_tree(sessions=[
+        make_session(session_id="$0", windows=[
+            make_window(window_id="@0", panes=[
+                make_pane(pane_id="%0"),
+            ])
+        ])
+    ])
+    tw = TmuxTreeView()
+    tw.populate(tree1)
+
+    # First population: everything expanded by default
+    session_node = tw.root.children[0]
+    window1_node = session_node.children[0]
+    assert window1_node.is_expanded
+
+    # Collapse the existing window manually to simulate user action
+    window1_node.collapse()
+    assert not window1_node.is_expanded
+
+    # Second population: add a new window
+    tree2 = make_tree(sessions=[
+        make_session(session_id="$0", windows=[
+            make_window(window_id="@0", panes=[
+                make_pane(pane_id="%0"),
+            ]),
+            make_window(window_id="@1", panes=[
+                make_pane(pane_id="%1"),
+            ]),
+        ])
+    ])
+    tw.populate(tree2)
+
+    session_node = tw.root.children[0]
+    window1_node = session_node.children[0]
+    window2_node = session_node.children[1]
+
+    # Previously existing window should stay collapsed
+    assert not window1_node.is_expanded
+    # New window should be auto-expanded
+    assert window2_node.is_expanded
+
+
