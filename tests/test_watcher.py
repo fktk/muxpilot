@@ -202,10 +202,14 @@ class TestProcessNotification:
         assert w.activities["%0"].status == PaneStatus.WAITING_INPUT
 
     def test_status_override_cleared_when_content_changes(self):
-        """status_override should be cleared when pane content changes."""
+        """status_override should be cleared when pane content changes after cooldown."""
+        import time as time_module
         w = self._watcher_with_pattern()
         w.process_notification("%0 WAITING")
         assert w.activities["%0"].status_override == PaneStatus.WAITING_INPUT
+
+        # Move past cooldown
+        w.activities["%0"].status_override_until = time_module.time() - 1.0
 
         # Change pane content so it doesn't match any prompt pattern
         w.client.capture_pane_content.return_value = ["new output line"]
@@ -214,6 +218,23 @@ class TestProcessNotification:
         # status_override should be cleared, and status should go back to ACTIVE
         assert w.activities["%0"].status_override is None
         assert w.activities["%0"].status == PaneStatus.ACTIVE
+
+    def test_status_override_preserved_during_cooldown_when_content_changes(self):
+        """status_override should be preserved during cooldown even if content changes."""
+        w = self._watcher_with_pattern()
+        w.process_notification("%0 WAITING")
+        assert w.activities["%0"].status_override == PaneStatus.WAITING_INPUT
+
+        # Change pane content immediately (within cooldown)
+        w.client.capture_pane_content.return_value = ["new output line"]
+        _, events = w.poll()
+
+        # status_override should still be set because we're in cooldown
+        assert w.activities["%0"].status_override == PaneStatus.WAITING_INPUT
+        assert w.activities["%0"].status == PaneStatus.WAITING_INPUT
+        # Should NOT emit a status_changed event for %0
+        status_events = [e for e in events if e.event_type == "status_changed" and e.pane_id == "%0"]
+        assert status_events == []
 
     def test_status_override_preserved_when_prompt_pattern_matches(self):
         """Even if content changes, if prompt pattern matches, status should stay WAITING."""

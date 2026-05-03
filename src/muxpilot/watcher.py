@@ -47,6 +47,10 @@ DEFAULT_ERROR_PATTERNS: list[re.Pattern[str]] = [
 DEFAULT_IDLE_THRESHOLD: float = 10.0
 DEFAULT_POLL_INTERVAL: float = 5.0
 
+# Cooldown period after a notification override during which content changes
+# will not clear the override (prevents immediate fallback to ACTIVE).
+DEFAULT_NOTIFICATION_COOLDOWN: float = 5.0
+
 
 class TmuxWatcher:
     """Monitors pane outputs via polling and detects status changes."""
@@ -168,7 +172,7 @@ class TmuxWatcher:
 
             content = self.client.capture_pane_content(pane.pane_id, self.capture_lines)
             old_activity = self._tracker.activities.get(pane.pane_id)
-            new_activity = self._tracker.analyze_pane(pane.pane_id, content, old_activity, poll_elapsed)
+            new_activity = self._tracker.analyze_pane(pane.pane_id, content, old_activity, poll_elapsed, now=now)
 
             old_status = old_activity.status if old_activity else PaneStatus.ACTIVE
             new_status = self._matcher.determine_status(
@@ -251,10 +255,12 @@ class TmuxWatcher:
         old_status = activity.status
         activity.status = PaneStatus.WAITING_INPUT
         activity.status_override = PaneStatus.WAITING_INPUT
+        activity.status_override_until = time.time() + DEFAULT_NOTIFICATION_COOLDOWN
         logger.debug(
-            "process_notification pane=%s status=%s → WAITING_INPUT (override set)",
+            "process_notification pane=%s status=%s → WAITING_INPUT (override set, cooldown_until=%.1f)",
             pane_id,
             old_status.value,
+            activity.status_override_until,
         )
 
         return TmuxEvent(

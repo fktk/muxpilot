@@ -169,6 +169,7 @@ class PaneActivity:
     content_changed: bool = False
     recent_lines: list[str] = field(default_factory=list)
     status_override: PaneStatus | None = None
+    status_override_until: float = 0.0
 
 
 @dataclass

@@ -57,6 +57,24 @@ class TestStatusTracker:
         second = tracker.analyze_pane("%0", ["world"], first, 0.0)
         assert second.status_override is None
 
+    def test_status_override_preserved_during_cooldown_on_change(self, tracker):
+        """If status_override_until is in the future, content change should not clear override."""
+        import time as time_module
+        first = tracker.analyze_pane("%0", ["hello"], None, 0.0)
+        first.status_override = PaneStatus.WAITING_INPUT
+        first.status_override_until = time_module.time() + 10.0  # future
+        second = tracker.analyze_pane("%0", ["world"], first, 0.0)
+        assert second.status_override == PaneStatus.WAITING_INPUT
+
+    def test_status_override_cleared_after_cooldown_on_change(self, tracker):
+        """If status_override_until is in the past, content change should clear override."""
+        import time as time_module
+        first = tracker.analyze_pane("%0", ["hello"], None, 0.0)
+        first.status_override = PaneStatus.WAITING_INPUT
+        first.status_override_until = time_module.time() - 1.0  # past
+        second = tracker.analyze_pane("%0", ["world"], first, 0.0)
+        assert second.status_override is None
+
     def test_status_override_preserved_when_unchanged(self, tracker):
         first = tracker.analyze_pane("%0", ["hello"], None, 0.0)
         first.status_override = PaneStatus.WAITING_INPUT

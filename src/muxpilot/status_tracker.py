@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 
 from muxpilot.models import PaneActivity, PaneStatus
 
@@ -23,8 +24,12 @@ class StatusTracker:
         content: list[str],
         old_activity: PaneActivity | None,
         poll_elapsed: float,
+        now: float | None = None,
     ) -> PaneActivity:
         """Analyze pane content and track idle time."""
+        if now is None:
+            now = time.time()
+
         content_str = "\n".join(content)
         content_hash = hashlib.md5(content_str.encode()).hexdigest()
         last_line = content[-1].strip() if content else ""
@@ -47,7 +52,8 @@ class StatusTracker:
         logger.debug("analyze_pane pane=%s idle_seconds=%.2f", pane_id, idle_seconds)
 
         status_override = old_activity.status_override if old_activity else None
-        if content_changed and status_override is not None:
+        status_override_until = old_activity.status_override_until if old_activity else 0.0
+        if content_changed and status_override is not None and now >= status_override_until:
             logger.debug(
                 "analyze_pane pane=%s status_override cleared (content_changed)",
                 pane_id,
@@ -63,6 +69,7 @@ class StatusTracker:
             content_changed=content_changed,
             recent_lines=recent_lines,
             status_override=status_override,
+            status_override_until=status_override_until,
         )
         self.activities[pane_id] = activity
         return activity
