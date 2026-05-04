@@ -43,6 +43,13 @@ class LabelStore:
             return 60
         return ui.get("tree_panel_max_width", 60)  # type: ignore[no-any-return]
 
+    def get_sidebar_hide_threshold(self) -> int:
+        """Return the sidebar hide threshold or 80 default."""
+        ui = self._doc.get("ui")
+        if ui is None:
+            return 80
+        return ui.get("sidebar_hide_threshold", 80)  # type: ignore[no-any-return]
+
     def _load(self) -> TOMLDocument:
         if self._path.exists():
             text = self._path.read_text(encoding="utf-8")

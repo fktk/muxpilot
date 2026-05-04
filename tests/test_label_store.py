@@ -94,6 +94,26 @@ class TestLabelStoreTreePanelMaxWidth:
         assert store.get_tree_panel_max_width() == 80
 
 
+class TestLabelStoreSidebarHideThreshold:
+    """Sidebar hide threshold get operations."""
+
+    def test_get_sidebar_hide_threshold_default(self, tmp_path: Path) -> None:
+        store = LabelStore(config_path=tmp_path / "config.toml")
+        assert store.get_sidebar_hide_threshold() == 80
+
+    def test_get_sidebar_hide_threshold_from_config(self, tmp_path: Path) -> None:
+        config_path = tmp_path / "config.toml"
+        config_path.write_text('[ui]\nsidebar_hide_threshold = 120\n')
+        store = LabelStore(config_path=config_path)
+        assert store.get_sidebar_hide_threshold() == 120
+
+    def test_get_sidebar_hide_threshold_zero_means_disabled(self, tmp_path: Path) -> None:
+        config_path = tmp_path / "config.toml"
+        config_path.write_text('[ui]\nsidebar_hide_threshold = 0\n')
+        store = LabelStore(config_path=config_path)
+        assert store.get_sidebar_hide_threshold() == 0
+
+
 class TestLabelStoreEdgeCases:
     """Edge case handling."""
 
