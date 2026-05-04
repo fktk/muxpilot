@@ -44,6 +44,13 @@ idle_threshold = 10.0
 # Default: 60
 tree_panel_max_width = 60
 
+# Sidebar hide threshold in characters.
+# When the terminal width is at or below this value, the detail panel (sidebar)
+# is automatically hidden to give more space to the tree panel.
+# Set to 0 to disable auto-hide.
+# Default: 80
+sidebar_hide_threshold = 80
+
 [notifications]
 # Show toast notifications when tmux polling fails.
 # Set to false to suppress "tmux poll failed" messages during normal use.
