@@ -143,3 +143,50 @@ async def test_notify_channel_started_on_mount():
         app._notify_channel.start.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_detail_panel_hidden_when_below_threshold():
+    """Terminal width below threshold should hide detail-panel."""
+    from textual.events import Resize
+    from textual.geometry import Size
+
+    app = _patched_app()
+    async with app.run_test():
+        detail = app.query_one("#detail-panel")
+        size = Size(70, 24)
+        await app.on_resize(Resize(app, size, size))
+        assert detail.styles.display == "none"
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_shown_when_above_threshold():
+    """Terminal width above threshold should show detail-panel."""
+    from textual.events import Resize
+    from textual.geometry import Size
+
+    app = _patched_app()
+    async with app.run_test():
+        detail = app.query_one("#detail-panel")
+        small = Size(70, 24)
+        large = Size(100, 24)
+        await app.on_resize(Resize(app, small, small))
+        assert detail.styles.display == "none"
+        await app.on_resize(Resize(app, large, large))
+        assert detail.styles.display == "block"
+
+
+@pytest.mark.asyncio
+async def test_detail_panel_never_hidden_when_threshold_is_zero(tmp_path):
+    """Threshold of 0 should disable auto-hide."""
+    from textual.events import Resize
+    from textual.geometry import Size
+
+    config_path = tmp_path / "config.toml"
+    config_path.write_text('[ui]\nsidebar_hide_threshold = 0\n')
+    app = _patched_app(config_path=config_path)
+    async with app.run_test():
+        detail = app.query_one("#detail-panel")
+        size = Size(70, 24)
+        await app.on_resize(Resize(app, size, size))
+        assert detail.styles.display == "block"
+
+

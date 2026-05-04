@@ -10,6 +10,7 @@ import sys
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.events import Resize
 from textual.widgets import Footer, Header, Input
 
 from muxpilot.app_actions import ActionHandler
@@ -200,6 +201,9 @@ class MuxpilotApp(App[str | None]):
         tree_panel = self.query_one("#tree-panel", Vertical)
         tree_panel.styles.max_width = self._label_store_instance.get_tree_panel_max_width()
 
+        # Apply initial sidebar visibility based on current terminal size
+        await self.on_resize(Resize(self, self.size))
+
         await self._notify_channel.start()
         self.set_interval(NOTIFY_CHECK_INTERVAL, self._ui.check_notifications)
 
@@ -220,6 +224,17 @@ class MuxpilotApp(App[str | None]):
 
     def action_quit(self) -> None:
         self._actions.action_quit()
+
+    async def on_resize(self, event: Resize) -> None:
+        """Hide or show the detail panel based on terminal width."""
+        threshold = self._label_store_instance.get_sidebar_hide_threshold()
+        if threshold <= 0:
+            return
+        detail = self.query_one("#detail-panel")
+        if event.virtual_size.width <= threshold:
+            detail.styles.display = "none"
+        else:
+            detail.styles.display = "block"
 
     async def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "filter-input":
