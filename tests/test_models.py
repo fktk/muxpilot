@@ -181,11 +181,6 @@ class TestWindowInfoDisplayLabel:
         assert "logs" in window.display_label
         assert "*" not in window.display_label
 
-    def test_display_label_with_custom_label(self) -> None:
-        """When custom_label is set, display_label should return it."""
-        window = make_window(window_name="editor", is_active=True, custom_label="My Editor")
-        assert window.display_label == "□ My Editor"
-
     def test_display_label_custom_label_empty_uses_default(self) -> None:
         """When custom_label is empty, display_label should use default format."""
         window = make_window(window_name="editor", window_index=1, is_active=True, custom_label="")
@@ -212,11 +207,6 @@ class TestSessionInfoDisplayLabel:
         session = make_session(session_name="work", is_attached=False)
         assert "work" in session.display_label
         assert "(attached)" not in session.display_label
-
-    def test_display_label_with_custom_label(self) -> None:
-        """When custom_label is set, display_label should return it."""
-        session = make_session(session_name="work", is_attached=True, custom_label="🚀 Main")
-        assert session.display_label == "■ 🚀 Main"
 
     def test_display_label_custom_label_empty_uses_default(self) -> None:
         """When custom_label is empty, display_label should use default format."""

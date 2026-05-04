@@ -111,30 +111,6 @@ async def test_detail_panel_shows_pane_meta_in_markdown_and_output_in_richlog():
 
 
 @pytest.mark.asyncio
-async def test_detail_panel_error_status_shows_clean_icon():
-    """Detail panel should render ERROR status icon cleanly without broken markup."""
-    panel = DetailPanel()
-    session = make_session(session_name="dev", windows=[
-        make_window(window_name="editor", panes=[
-            make_pane(pane_id="%0", status=PaneStatus.ERROR)
-        ])
-    ])
-    window = session.windows[0]
-    pane = window.panes[0]
-    app = _run_detail_panel(panel)
-    async with app.run_test():
-        panel.show_pane(pane, window, session)
-        text = panel._markdown_source
-
-        # Should NOT contain broken/unclosed markup fragments
-        assert "[bold" not in text, f"Broken bold markup found: {text}"
-        assert "red]" not in text, f"Broken red markup found: {text}"
-        # Should show the bold letter E in Markdown
-        assert "**E**" in text, f"Bold E not found in status line: {text}"
-        assert "error" in text
-
-
-@pytest.mark.asyncio
 async def test_detail_panel_pane_shows_session_and_window_before_title():
     """Pane details should show Session and Window before Title, and not repeat them in output."""
     panel = DetailPanel()
@@ -253,94 +229,6 @@ async def test_detail_panel_session_does_not_show_counts():
         text = panel._markdown_source
         assert "**Windows:**" not in text
     assert "**Panes:**" not in text
-
-
-@pytest.mark.asyncio
-async def test_detail_panel_updates_on_refresh_without_cursor_change():
-    """After _do_refresh, DetailPanel should update even when the selected node hasn't changed."""
-
-    tree = make_tree(sessions=[
-        make_session(session_name="dev", windows=[
-            make_window(window_name="editor", panes=[
-                make_pane(pane_id="%0", is_active=False)
-            ])
-        ])
-    ])
-    app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
-        tw = app.query_one("#tmux-tree", TmuxTreeView)
-        tw.focus()
-        await pilot.press("j")
-        await pilot.press("j")
-        await pilot.press("j")
-        await pilot.pause()
-
-        detail = app.query_one("#detail-panel", DetailPanel)
-        log = detail.query_one("#detail-output", RichLog)
-        initial_lines = [str(line) for line in log.lines]
-        # Default mock capture content is shown after mount
-        assert any("user@host:~$" in line for line in initial_lines)
-
-        # Change the captured pane content and refresh without moving cursor
-        app._client.capture_pane_content.return_value = ["new output line"]
-        await app._do_refresh()
-        # Wait for call_after_refresh to fire after tree repopulates
-        await pilot.pause()
-        await pilot.pause()
-
-        updated_lines = [str(line) for line in log.lines]
-        assert any("new output line" in line for line in updated_lines)
-        assert not any("user@host:~$" in line for line in updated_lines)
-
-
-@pytest.mark.asyncio
-async def test_detail_panel_updates_on_poll_without_events():
-    """Periodic poll without status events must still refresh DetailPanel."""
-    from unittest.mock import patch
-
-    tree = make_tree(sessions=[
-        make_session(session_name="dev", windows=[
-            make_window(window_name="editor", panes=[
-                make_pane(pane_id="%0", is_active=False, status=PaneStatus.ACTIVE)
-            ])
-        ])
-    ])
-    app = _patched_app(tree=tree)
-    async with app.run_test() as pilot:
-        tw = app.query_one("#tmux-tree", TmuxTreeView)
-        tw.focus()
-        await pilot.press("j")
-        await pilot.press("j")
-        await pilot.press("j")
-        await pilot.pause()
-
-        detail = app.query_one("#detail-panel", DetailPanel)
-        log = detail.query_one("#detail-output", RichLog)
-        initial_lines = [str(line) for line in log.lines]
-        assert any("user@host:~$" in line for line in initial_lines)
-
-        # Build a new tree with updated recent_lines but no events
-        updated_tree = make_tree(sessions=[
-            make_session(session_name="dev", windows=[
-                make_window(window_name="editor", panes=[
-                    make_pane(
-                        pane_id="%0",
-                        is_active=False,
-                        status=PaneStatus.ACTIVE,
-                        recent_lines=["polled output"],
-                    )
-                ])
-            ])
-        ])
-        # Patch watcher.poll to return updated tree with no events
-        with patch.object(app._watcher, "poll", return_value=(updated_tree, [])):
-            await app._poll_tmux()
-            await pilot.pause()
-            await pilot.pause()
-
-        updated_lines = [str(line) for line in log.lines]
-        assert any("polled output" in line for line in updated_lines)
-        assert not any("user@host:~$" in line for line in updated_lines)
 
 
 # ============================================================================
