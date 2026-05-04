@@ -60,7 +60,7 @@ class DetailPanel(Widget):
         super().__init__(name=name, id=id)
         self._meta = Markdown("Select a node to see details", id="detail-meta")
         self._log = RichLog(
-                id="detail-output", highlight=True, markup=True, max_lines=35,
+                id="detail-output", highlight=True, max_lines=35,
                 )
         self._markdown_source = ""
 
@@ -73,7 +73,10 @@ class DetailPanel(Widget):
         icon = STATUS_ICONS.get(pane.status, "?")
         markdown_icon = rich_to_markdown(icon)
         status_name = pane.status.value if pane.status else "unknown"
-        idle_text = f" ({pane.idle_seconds:.1f}s idle)" if pane.idle_seconds > 0 else ""
+        if (pane.idle_seconds > 0 and status_name == "idle"):
+            idle_text = f" ({pane.idle_seconds:.1f}s idle)"
+        else:
+            idle_text = ""
         title = pane.pane_title or "—"
         repo = pane.repo_name or "—"
         branch = pane.branch or "—"
@@ -88,7 +91,7 @@ class DetailPanel(Widget):
             f"- **Branch:** {branch}\n"
             f"- **Command:** `{pane.full_command or pane.current_command}`\n"
             f"- **Path:** {_shorten_path(pane.current_path)}\n"
-            f"- **Status:** {markdown_icon} {status_name}{idle_text}\n"
+            f"- **Status:** {status_name.upper()}{idle_text}\n"
         )
 
         if pane.status == PaneStatus.ERROR:

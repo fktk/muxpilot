@@ -109,9 +109,9 @@ class WindowInfo:
     def display_label(self) -> str:
         """Label for tree view display."""
         if self.custom_label:
-            return f"□ {self.custom_label}"
+            return f"{self.custom_label}"
         active = " *" if self.is_active else ""
-        return f"□ {self.window_index}: {self.window_name}{active}"
+        return f"{self.window_index}: {self.window_name}{active}"
 
 
 @dataclass
@@ -128,9 +128,9 @@ class SessionInfo:
     def display_label(self) -> str:
         """Label for tree view display."""
         if self.custom_label:
-            return f"■ {self.custom_label}"
+            return f"{self.custom_label}"
         attached = " (attached)" if self.is_attached else ""
-        return f"■ {self.session_name}{attached}"
+        return f"{self.session_name}{attached}"
 
 
 @dataclass
