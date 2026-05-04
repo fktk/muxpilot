@@ -13,7 +13,7 @@ class TestStatusTracker:
 
     @pytest.fixture
     def tracker(self):
-        return StatusTracker(preview_lines=30)
+        return StatusTracker(preview_lines=50)
 
     def test_first_analysis(self, tracker):
         activity = tracker.analyze_pane("%0", ["hello"], None, 0.0)

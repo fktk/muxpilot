@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class StatusTracker:
     """Tracks pane output changes for status detection."""
 
-    def __init__(self, preview_lines: int = 30) -> None:
+    def __init__(self, preview_lines: int = 50) -> None:
         self.preview_lines = preview_lines
         self.activities: dict[str, PaneActivity] = {}
 

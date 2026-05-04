@@ -80,6 +80,7 @@ class DetailPanel(Widget):
             f"## Pane\n\n"
             f"- **Session:** {session.session_name}\n"
             f"- **Window:** {window.window_name} (#{window.window_index})\n"
+            f"- **ID:** {pane.pane_id}\n"
             f"- **Title:** {title}\n"
             f"- **Repository:** {repo}\n"
             f"- **Branch:** {branch}\n"
