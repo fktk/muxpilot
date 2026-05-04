@@ -59,7 +59,9 @@ class DetailPanel(Widget):
     def __init__(self, name: str | None = None, id: str | None = None) -> None:
         super().__init__(name=name, id=id)
         self._meta = Markdown("Select a node to see details", id="detail-meta")
-        self._log = RichLog(id="detail-output", highlight=True, markup=True)
+        self._log = RichLog(
+                id="detail-output", highlight=True, markup=True, max_lines=35,
+                )
         self._markdown_source = ""
 
     def compose(self) -> ComposeResult:
