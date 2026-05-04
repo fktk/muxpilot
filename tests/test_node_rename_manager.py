@@ -36,6 +36,13 @@ def make_node_data(node_type: str, session_name="work", window_index=0, pane_ind
     return (node_type, session, window, pane)
 
 
+class TestBackwardCompat:
+    def test_pane_title_manager_alias(self) -> None:
+        from muxpilot.controllers import PaneTitleManager
+
+        assert PaneTitleManager is NodeRenameManager
+
+
 class TestPaneRename:
     def test_start_returns_pane_title(self) -> None:
         client = MagicMock()
@@ -86,6 +93,20 @@ class TestPaneRename:
 
 
 class TestWindowRename:
+    def test_finish_without_start_is_noop(self) -> None:
+        client = MagicMock()
+        ctrl = NodeRenameManager(client)
+        assert ctrl.finish("x") is None
+        client.rename_window.assert_not_called()
+
+    def test_cancel_clears_key_without_saving(self) -> None:
+        client = MagicMock()
+        ctrl = NodeRenameManager(client)
+        ctrl.start(make_node_data("window", session_name="work"))
+        ctrl.cancel()
+        assert ctrl.key is None
+        assert ctrl._target_id is None
+
     def test_start_returns_window_name(self) -> None:
         client = MagicMock()
         ctrl = NodeRenameManager(client)
@@ -117,6 +138,20 @@ class TestWindowRename:
 
 
 class TestSessionRename:
+    def test_finish_without_start_is_noop(self) -> None:
+        client = MagicMock()
+        ctrl = NodeRenameManager(client)
+        assert ctrl.finish("x") is None
+        client.rename_session.assert_not_called()
+
+    def test_cancel_clears_key_without_saving(self) -> None:
+        client = MagicMock()
+        ctrl = NodeRenameManager(client)
+        ctrl.start(make_node_data("session", session_name="work"))
+        ctrl.cancel()
+        assert ctrl.key is None
+        assert ctrl._target_id is None
+
     def test_start_returns_session_name(self) -> None:
         client = MagicMock()
         ctrl = NodeRenameManager(client)

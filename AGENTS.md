@@ -33,7 +33,7 @@ src/muxpilot/
 ├── app.py              # Textual App（レイアウト・キーバインド・event handler の薄いラッパー）
 ├── app_actions.py      # キーイベントアクションの実装（ActionHandler）
 ├── app_ui.py           # ポーリング結果の UI 反映・詳細パネル更新（UIOrchestrator）
-├── controllers.py      # FilterState, PaneTitleManager（ Pane リネーム・フィルター状態）
+├── controllers.py      # FilterState, NodeRenameManager（ Pane リネーム・フィルター状態）
 ├── models.py           # データモデル（Session/Window/Pane/PaneStatus）
 ├── pattern_matcher.py  # 出力パターン検出（waiting/error/active）
 ├── status_tracker.py   # ペインごとの履歴・idle 秒数追跡
