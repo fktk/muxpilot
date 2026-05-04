@@ -282,3 +282,34 @@ async def test_rename_session_empty_ignored():
         app._client.rename_session.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_rename_window_empty_calls_rename_window():
+    """Submitting empty string for window should call rename_window with empty string."""
+    from textual.widgets import Input
+
+    tree = make_tree(sessions=[
+        make_session(session_name="work", session_id="$0", windows=[
+            make_window(window_name="editor", window_index=0, window_id="@0", panes=[
+                make_pane(pane_id="%0", pane_index=0),
+            ])
+        ])
+    ])
+    app = _patched_app(tree=tree)
+    async with app.run_test() as pilot:
+        tw = app.query_one("#tmux-tree", TmuxTreeView)
+        tw.focus()
+        await pilot.press("j")
+        await pilot.press("j")
+        await pilot.pause()
+
+        await app.action_rename()
+        await pilot.pause()
+
+        ri = app.query_one("#rename-input", Input)
+        ri.value = ""
+        await pilot.press("enter")
+        await pilot.pause()
+
+        app._client.rename_window.assert_called_once_with("@0", "")
+
+
