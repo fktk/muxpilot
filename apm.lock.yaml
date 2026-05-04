@@ -1,0 +1,13 @@
+lockfile_version: '1'
+generated_at: '2026-05-04T23:46:00.280360+00:00'
+apm_version: 0.12.1
+dependencies:
+- repo_url: upstash/context7
+  host: github.com
+  resolved_commit: 85c3a0cbfdab70f00c3bed5f8b6ca0e445077151
+  virtual_path: skills/find-docs
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/find-docs
+  content_hash: sha256:0210767e57873317edc8b91783a2f1b74eb9bbdd2139bd14e9129e9a0bbc2dd6

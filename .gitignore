@@ -13,6 +13,6 @@ wheels/
 # Test caches
 .pytest_cache/
 
-# Local development docs / plans
-docs/
-!docs/superpowers/specs/
+
+# APM dependencies
+apm_modules/

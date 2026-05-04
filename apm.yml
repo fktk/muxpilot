@@ -1,0 +1,10 @@
+name: muxpilot
+version: 1.0.0
+description: tmuxのペインをナビゲートするTUIツール
+author: Takefumi Fukumoto
+dependencies:
+  apm:
+  - upstash/context7/skills/find-docs
+  mcp: []
+includes: auto
+scripts: {}
