@@ -14,7 +14,7 @@ from textual.widgets import Footer, Header, Input
 
 from muxpilot.app_actions import ActionHandler
 from muxpilot.app_ui import UIOrchestrator
-from muxpilot.controllers import FilterState, PaneTitleManager
+from muxpilot.controllers import FilterState, NodeRenameManager
 from muxpilot.label_store import LabelStore
 from muxpilot.logging_config import setup_logging
 from muxpilot.timer_coordinator import TimerCoordinator
@@ -107,7 +107,7 @@ class MuxpilotApp(App[str | None]):
         self._notify_config_error()
 
         self._filter_state = FilterState()
-        self._rename_controller = PaneTitleManager(self._client)
+        self._rename_controller = NodeRenameManager(self._client)
         self._ui = UIOrchestrator(self)
         self._actions = ActionHandler(self)
         self._polling = TimerCoordinator(
