@@ -5,7 +5,7 @@ from __future__ import annotations
 import pathlib
 
 from muxpilot.app import MuxpilotApp
-from muxpilot.controllers import PaneTitleManager
+from muxpilot.controllers import NodeRenameManager
 from muxpilot.watcher import TmuxWatcher
 
 from conftest import make_mock_client, make_mock_notify_channel
@@ -16,7 +16,7 @@ def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error
     mock_client = make_mock_client(tree=tree, current_pane_id=current_pane_id)
     app = MuxpilotApp(config_path=config_path)
     app._client = mock_client
-    app._rename_controller = PaneTitleManager(mock_client)
+    app._rename_controller = NodeRenameManager(mock_client)
     app._watcher = TmuxWatcher(mock_client, config_path=pathlib.Path("/nonexistent-muxpilot-config"))
     app._notify_channel = make_mock_notify_channel()
     if config_error is not None:

@@ -210,3 +210,37 @@ class TestPaneTitleAndGit:
             c = TmuxClient()
             result = c.set_pane_title("%1", "new-title")
         assert result is False
+
+    def test_rename_window_calls_tmux(self):
+        mock_server = MagicMock()
+        with patch("muxpilot.tmux_client.libtmux.Server", return_value=mock_server):
+            c = TmuxClient()
+            result = c.rename_window("@1", "new-window")
+        mock_server.cmd.assert_called_once_with("rename-window", "-t", "@1", "new-window")
+        assert result is True
+
+    def test_rename_window_failure(self):
+        import libtmux.exc
+        mock_server = MagicMock()
+        mock_server.cmd.side_effect = libtmux.exc.LibTmuxException("fail")
+        with patch("muxpilot.tmux_client.libtmux.Server", return_value=mock_server):
+            c = TmuxClient()
+            result = c.rename_window("@99", "x")
+        assert result is False
+
+    def test_rename_session_calls_tmux(self):
+        mock_server = MagicMock()
+        with patch("muxpilot.tmux_client.libtmux.Server", return_value=mock_server):
+            c = TmuxClient()
+            result = c.rename_session("$1", "new-session")
+        mock_server.cmd.assert_called_once_with("rename-session", "-t", "$1", "new-session")
+        assert result is True
+
+    def test_rename_session_failure(self):
+        import libtmux.exc
+        mock_server = MagicMock()
+        mock_server.cmd.side_effect = libtmux.exc.LibTmuxException("fail")
+        with patch("muxpilot.tmux_client.libtmux.Server", return_value=mock_server):
+            c = TmuxClient()
+            result = c.rename_session("$99", "x")
+        assert result is False

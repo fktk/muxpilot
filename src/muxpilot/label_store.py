@@ -15,7 +15,7 @@ class LabelStore:
     """Reads and writes app settings (theme) to a TOML config file.
 
     Custom labels are no longer persisted — they are handled in-memory
-    by PaneTitleManager.
+    by NodeRenameManager.
     """
 
     def __init__(self, config_path: Path | None = None) -> None:

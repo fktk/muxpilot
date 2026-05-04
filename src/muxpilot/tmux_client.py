@@ -129,3 +129,21 @@ class TmuxClient:
             return True
         except Exception:
             return False
+
+    def rename_window(self, window_id: str, name: str) -> bool:
+        """Rename a tmux window."""
+        server = libtmux.Server()
+        try:
+            server.cmd("rename-window", "-t", window_id, name)
+            return True
+        except Exception:
+            return False
+
+    def rename_session(self, session_id: str, name: str) -> bool:
+        """Rename a tmux session."""
+        server = libtmux.Server()
+        try:
+            server.cmd("rename-session", "-t", session_id, name)
+            return True
+        except Exception:
+            return False
