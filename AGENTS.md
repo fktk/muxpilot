@@ -64,7 +64,7 @@ tests/
 ├── test_kill_modal.py
 ├── test_label_store.py
 ├── test_models.py
-├── test_pane_title_manager.py
+├── test_node_rename_manager.py
 ├── test_pattern_matcher.py
 ├── test_status_tracker.py
 ├── test_structural_detector.py
