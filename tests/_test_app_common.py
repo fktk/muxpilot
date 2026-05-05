@@ -11,7 +11,7 @@ from muxpilot.watcher import TmuxWatcher
 from conftest import make_mock_client, make_mock_notify_channel
 
 
-def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error=None, config_path=None):
+def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error=None, config_path=pathlib.Path("/nonexistent-config-for-test")):
     """Create a MuxpilotApp with a mocked TmuxClient/Watcher."""
     mock_client = make_mock_client(tree=tree, current_pane_id=current_pane_id)
     app = MuxpilotApp(config_path=config_path)
