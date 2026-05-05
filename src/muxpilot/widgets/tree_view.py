@@ -20,6 +20,22 @@ _ANIMATION_COLORS = [
 class TmuxTreeView(Tree[Text]):
     """A tree widget that displays the tmux session → window → pane hierarchy."""
 
+    DEFAULT_CSS = """
+    TmuxTreeView {
+        & > .tree--cursor {
+            text-style: none;
+            background: transparent;
+        }
+        &:focus {
+            & > .tree--cursor {
+                color: $block-cursor-foreground;
+                background: $block-cursor-background;
+                text-style: $block-cursor-text-style;
+            }
+        }
+    }
+    """
+
     BINDINGS = [
         ("k", "cursor_up", "Up"),
         ("j", "cursor_down", "Down"),

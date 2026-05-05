@@ -121,3 +121,13 @@ def test_new_window_is_auto_expanded():
     assert window2_node.is_expanded
 
 
+def test_default_css_hides_cursor_when_blurred():
+    """TmuxTreeView should override tree--cursor styles to hide highlight when not focused."""
+    css = TmuxTreeView.DEFAULT_CSS
+    assert "TmuxTreeView" in css
+    assert "& > .tree--cursor" in css
+    assert "text-style: none" in css
+    assert "background: transparent" in css
+    assert "&:focus" in css
+    assert "$block-cursor-background" in css
+
