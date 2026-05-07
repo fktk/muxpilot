@@ -1,6 +1,6 @@
 
 from muxpilot.models import PaneStatus
-from muxpilot.widgets.tree_view import TmuxTreeView
+from muxpilot.widgets.tree_view import TmuxTreeView, _ACTIVE_ANIMATION_FRAMES
 from conftest import make_tree, make_session, make_window, make_pane
 
 
@@ -43,7 +43,7 @@ def test_self_pane_hidden():
     assert "%1" not in tw._pane_map
 
 
-def test_error_pane_icon_is_red():
+def test_error_pane_icon_is_emoji():
     tree = make_tree(sessions=[
         make_session(windows=[make_window(panes=[
             make_pane(pane_id="%0", status=PaneStatus.ERROR),
@@ -53,9 +53,33 @@ def test_error_pane_icon_is_red():
     tw.populate(tree)
     pane_node = tw.root.children[0].children[0].children[0]
     label = pane_node.label
-    # The label should contain a red-styled span
-    assert any("red" in (span.style or "") for span in label.spans), \
-        f"ERROR pane icon should be red, got spans: {label.spans}"
+    # The label should contain the error emoji
+    assert "🚨" in label.plain, f"ERROR pane icon should be 🚨, got: {label.plain}"
+
+
+def test_active_animation_frames_defined():
+    """_ACTIVE_ANIMATION_FRAMES should be a non-empty list of emoji frames."""
+    assert len(_ACTIVE_ANIMATION_FRAMES) > 0
+    assert isinstance(_ACTIVE_ANIMATION_FRAMES, list)
+    for frame in _ACTIVE_ANIMATION_FRAMES:
+        assert isinstance(frame, str)
+        assert len(frame) > 0
+
+
+def test_active_pane_uses_emoji_on_populate():
+    """ACTIVE panes should use emoji frames even on initial populate, not 'A'."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", status=PaneStatus.ACTIVE, is_active=True),
+        ])])
+    ])
+    tw = TmuxTreeView()
+    tw.populate(tree)
+    pane_node = tw.root.children[0].children[0].children[0]
+    label = pane_node.label
+    # Should use the current animation frame emoji, not the letter 'A'
+    assert _ACTIVE_ANIMATION_FRAMES[tw._animation_frame % len(_ACTIVE_ANIMATION_FRAMES)] in label.plain
+    assert "A" not in label.plain
 
 
 def test_active_pane_label_animated():
@@ -68,13 +92,42 @@ def test_active_pane_label_animated():
     tw.populate(tree)
     pane_node = tw.root.children[0].children[0].children[0]
     initial_label = pane_node.label
+    # On populate, ACTIVE panes already use the current animation frame
+    assert _ACTIVE_ANIMATION_FRAMES[0] in initial_label.plain
 
-    tw._animation_frame = 0
     tw._animate_active_icons()
 
     assert tw._animation_frame == 1
     new_label = pane_node.label
     assert initial_label != new_label
+    # After animation, the label should contain the next animation frame
+    assert _ACTIVE_ANIMATION_FRAMES[1] in new_label.plain
+
+
+def test_active_animation_frames_cycle():
+    """Animation frames should cycle back to the first after the last frame."""
+    tree = make_tree(sessions=[
+        make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%0", status=PaneStatus.ACTIVE, is_active=True),
+        ])])
+    ])
+    tw = TmuxTreeView()
+    tw.populate(tree)
+
+    frame_count = len(_ACTIVE_ANIMATION_FRAMES)
+    labels = []
+    for i in range(frame_count + 1):
+        tw._animation_frame = i - 1
+        tw._animate_active_icons()
+        pane_node = tw.root.children[0].children[0].children[0]
+        labels.append(pane_node.label.plain)
+
+    # Each frame should produce the correct label
+    for i in range(frame_count):
+        assert _ACTIVE_ANIMATION_FRAMES[i % frame_count] in labels[i]
+
+    # After cycling through all frames, the next should match frame 0 again
+    assert _ACTIVE_ANIMATION_FRAMES[0] in labels[frame_count]
 
 
 def test_new_window_is_auto_expanded():

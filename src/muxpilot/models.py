@@ -18,9 +18,9 @@ class PaneStatus(Enum):
 # ステータスに対応するアイコン
 STATUS_ICONS: dict[PaneStatus, str] = {
     PaneStatus.ACTIVE: "[bold]A[/bold]",
-    PaneStatus.WAITING_INPUT: "[bold]W[/bold]",
-    PaneStatus.ERROR: "[bold red]E[/bold red]",
-    PaneStatus.IDLE: "[bold]I[/bold]",
+    PaneStatus.WAITING_INPUT: "✋",
+    PaneStatus.ERROR: "🚨",
+    PaneStatus.IDLE: "🛌",
 }
 
 

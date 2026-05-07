@@ -11,9 +11,9 @@ from textual.widgets._tree import TreeNode
 
 from muxpilot.models import PaneInfo, PaneStatus, SessionInfo, TmuxTree, WindowInfo
 
-# Pastel colors for the ACTIVE icon animation (no red)
-_ANIMATION_COLORS = [
-    "#FFD4A3", "#FFFFB3", "#B3FFB3", "#B3D9FF", "#D9B3FF",
+# Emoji frames for the ACTIVE icon animation (person running)
+_ACTIVE_ANIMATION_FRAMES = [
+    "🚶", "🏃",
 ]
 
 
@@ -245,10 +245,10 @@ class TmuxTreeView(Tree[Text]):
         self._has_populated = True
 
     def _animate_active_icons(self) -> None:
-        """Cycle the color of ACTIVE pane icons."""
+        """Cycle the emoji of ACTIVE pane icons."""
         self._animation_frame += 1
-        color = _ANIMATION_COLORS[self._animation_frame % len(_ANIMATION_COLORS)]
-        animated_icon = f"[{color}]A[/{color}]"
+        frame = _ACTIVE_ANIMATION_FRAMES[self._animation_frame % len(_ACTIVE_ANIMATION_FRAMES)]
+        animated_icon = frame
 
         for node_id, data in self._node_data.items():
             node_type, session, window, pane = data
@@ -261,6 +261,9 @@ class TmuxTreeView(Tree[Text]):
 
     def _build_pane_label(self, pane: PaneInfo, icon: str | None = None) -> Text:
         """Build a Rich Text label for a pane, optionally overriding the icon."""
+        if icon is None and pane.status == PaneStatus.ACTIVE:
+            frame = _ACTIVE_ANIMATION_FRAMES[self._animation_frame % len(_ACTIVE_ANIMATION_FRAMES)]
+            icon = frame
         markup = pane.get_display_label(icon_override=icon)
         label_text = Text.from_markup(markup)
         if pane.is_active:

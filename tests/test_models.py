@@ -23,12 +23,12 @@ from conftest import make_pane, make_session, make_tree, make_window
 
 
 def test_status_icons_use_bold_letters():
-    """STATUS_ICONS should use bold letters for clarity."""
+    """STATUS_ICONS should use bold letters (or emoji) for clarity."""
     expected = {
         PaneStatus.ACTIVE: "[bold]A[/bold]",
-        PaneStatus.WAITING_INPUT: "[bold]W[/bold]",
-        PaneStatus.ERROR: "[bold red]E[/bold red]",
-        PaneStatus.IDLE: "[bold]I[/bold]",
+        PaneStatus.WAITING_INPUT: "✋",
+        PaneStatus.ERROR: "🚨",
+        PaneStatus.IDLE: "🛌",
     }
     assert STATUS_ICONS == expected
 
