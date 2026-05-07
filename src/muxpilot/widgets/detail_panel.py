@@ -72,7 +72,7 @@ class DetailPanel(Widget):
         """Display pane details."""
         icon = STATUS_ICONS.get(pane.status, "?")
         markdown_icon = rich_to_markdown(icon)
-        status_name = pane.status.value if pane.status else "unknown"
+        status_name = pane.status.value
         if (pane.idle_seconds > 0 and status_name == "idle"):
             idle_text = f" ({pane.idle_seconds:.1f}s idle)"
         else:

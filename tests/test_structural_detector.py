@@ -67,6 +67,18 @@ class TestStructuralChangeDetector:
         assert len(focus_events) == 1
         assert focus_events[0].pane_id == "%1"
 
+    def test_window_added(self, detector):
+        old = make_tree(sessions=[make_session(session_name="s1", windows=[make_window(window_id="@0", window_name="w1")])])
+        new = make_tree(sessions=[make_session(session_name="s1", windows=[make_window(window_id="@0", window_name="w1"), make_window(window_id="@1", window_name="w2")])])
+        events = detector.detect(old, new)
+        assert any(e.event_type == "window_added" and e.window_name == "@1" for e in events)
+
+    def test_window_removed(self, detector):
+        old = make_tree(sessions=[make_session(session_name="s1", windows=[make_window(window_id="@0", window_name="w1"), make_window(window_id="@1", window_name="w2")])])
+        new = make_tree(sessions=[make_session(session_name="s1", windows=[make_window(window_id="@0", window_name="w1")])])
+        events = detector.detect(old, new)
+        assert any(e.event_type == "window_removed" and e.window_name == "@1" for e in events)
+
     def test_no_focus_event_when_unchanged(self, detector):
         tree = make_tree(sessions=[make_session(windows=[make_window(panes=[
             make_pane(pane_id="%0", is_active=True),

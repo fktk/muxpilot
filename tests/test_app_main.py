@@ -77,8 +77,4 @@ def test_main_outside_tmux_attaches_even_if_session_exists(mock_client_cls, mock
     )
 
 
-# ============================================================================
-# Polling cooldown
-# ============================================================================
-
 

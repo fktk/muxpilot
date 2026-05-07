@@ -54,6 +54,27 @@ class StructuralChangeDetector:
                 )
             )
 
+        old_window_ids = {w.window_id for s in old_tree.sessions for w in s.windows}
+        new_window_ids = {w.window_id for s in new_tree.sessions for w in s.windows}
+
+        for window_id in new_window_ids - old_window_ids:
+            events.append(
+                TmuxEvent(
+                    event_type="window_added",
+                    window_name=window_id,
+                    message=f"Window added: {window_id}",
+                )
+            )
+
+        for window_id in old_window_ids - new_window_ids:
+            events.append(
+                TmuxEvent(
+                    event_type="window_removed",
+                    window_name=window_id,
+                    message=f"Window removed: {window_id}",
+                )
+            )
+
         old_active = {p.pane_id for p in old_tree.all_panes() if p.is_active}
         new_active = {p.pane_id for p in new_tree.all_panes() if p.is_active}
         if old_active != new_active:

@@ -7,6 +7,7 @@ import subprocess
 import time
 
 import libtmux
+import psutil
 
 from muxpilot.models import TmuxTree
 from muxpilot.tree_parser import TreeParser
@@ -49,13 +50,15 @@ class TmuxClient:
         tree = TreeParser.parse_list_panes_output(result.stdout, self_pane_id)
         tree.timestamp = time.time()
 
-        # Attach git metadata (not available from tmux format strings)
+        # Attach git metadata and full command (not available from tmux format strings)
         for session in tree.sessions:
             for window in session.windows:
                 for pane in window.panes:
                     git_info = self._get_git_info(pane.current_path)
                     pane.repo_name = git_info["repo_name"]
                     pane.branch = git_info["branch"]
+                    if pane.pane_pid:
+                        pane.full_command = self._get_full_command(pane.pane_pid)
 
         return tree
 
@@ -120,6 +123,14 @@ class TmuxClient:
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
             pass
         return result
+
+    def _get_full_command(self, pid: int) -> str:
+        """Get the full command line for a process by PID."""
+        try:
+            proc = psutil.Process(pid)
+            return " ".join(proc.cmdline())
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            return ""
 
     def set_pane_title(self, pane_id: str, title: str) -> bool:
         """Set the tmux pane title."""

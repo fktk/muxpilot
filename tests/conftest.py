@@ -31,6 +31,7 @@ def make_pane(
     branch: str = "",
     idle_seconds: float = 0.0,
     recent_lines: list[str] | None = None,
+    pane_pid: int = 0,
 ) -> PaneInfo:
     """Create a PaneInfo with sensible defaults."""
     return PaneInfo(
@@ -50,6 +51,7 @@ def make_pane(
         branch=branch,
         idle_seconds=idle_seconds,
         recent_lines=recent_lines or [],
+        pane_pid=pane_pid,
     )
 
 

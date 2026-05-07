@@ -6,6 +6,7 @@ import pathlib
 
 from muxpilot.app import MuxpilotApp
 from muxpilot.controllers import NodeRenameManager
+from muxpilot.timer_coordinator import TimerCoordinator
 from muxpilot.watcher import TmuxWatcher
 
 from conftest import make_mock_client, make_mock_notify_channel
@@ -19,6 +20,12 @@ def _patched_app(tree=None, current_pane_id=None, label_store=None, config_error
     app._rename_controller = NodeRenameManager(mock_client)
     app._watcher = TmuxWatcher(mock_client, config_path=pathlib.Path("/nonexistent-muxpilot-config"))
     app._notify_channel = make_mock_notify_channel()
+    app._polling = TimerCoordinator(
+        watcher=app._watcher,
+        on_tick=app._ui.handle_poll_result,
+        notify_channel=app._notify_channel,
+        set_interval=app.set_interval,
+    )
     if config_error is not None:
         app._watcher._config_error = config_error
         app._notify_config_error()

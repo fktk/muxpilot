@@ -9,6 +9,7 @@ import time
 import tomllib
 
 from muxpilot.models import (
+    DEFAULT_CONFIG_PATH,
     PaneActivity,
     PaneStatus,
     TmuxEvent,
@@ -80,7 +81,7 @@ class TmuxWatcher:
 
         # Override with config if present
         if config_path is None:
-            config_path = pathlib.Path.home() / ".config/muxpilot/config.toml"
+            config_path = DEFAULT_CONFIG_PATH
         if config_path.exists():
             try:
                 with open(config_path, "rb") as f:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pathlib
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -57,6 +58,7 @@ class PaneInfo:
     branch: str = ""
     idle_seconds: float = 0.0
     recent_lines: list[str] = field(default_factory=list)
+    pane_pid: int = 0
 
     def get_display_label(self, icon_override: str | None = None) -> str:
         """Label for tree view display.
@@ -183,6 +185,9 @@ class TmuxEvent:
     old_status: PaneStatus | None = None
     new_status: PaneStatus | None = None
     message: str = ""
+
+
+DEFAULT_CONFIG_PATH = pathlib.Path.home() / ".config" / "muxpilot" / "config.toml"
 
 
 def _shorten_path(path: str) -> str:

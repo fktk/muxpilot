@@ -11,6 +11,8 @@ import logging.handlers
 import pathlib
 import tomllib
 
+from muxpilot.models import DEFAULT_CONFIG_PATH
+
 
 def setup_logging(
     log_path: pathlib.Path | None = None,
@@ -35,7 +37,7 @@ def setup_logging(
     # Determine level from config
     level = logging.INFO
     if config_path is None:
-        config_path = pathlib.Path.home() / ".config/muxpilot/config.toml"
+        config_path = DEFAULT_CONFIG_PATH
     if config_path.exists():
         try:
             with open(config_path, "rb") as f:

@@ -7,8 +7,7 @@ from pathlib import Path
 import tomlkit
 from tomlkit.toml_document import TOMLDocument
 
-
-DEFAULT_CONFIG_PATH = Path.home() / ".config" / "muxpilot" / "config.toml"
+from muxpilot.models import DEFAULT_CONFIG_PATH
 
 
 class LabelStore:

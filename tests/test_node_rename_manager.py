@@ -36,13 +36,6 @@ def make_node_data(node_type: str, session_name="work", window_index=0, pane_ind
     return (node_type, session, window, pane)
 
 
-class TestBackwardCompat:
-    def test_pane_title_manager_alias(self) -> None:
-        from muxpilot.controllers import PaneTitleManager
-
-        assert PaneTitleManager is NodeRenameManager
-
-
 class TestPaneRename:
     def test_start_returns_pane_title(self) -> None:
         client = MagicMock()

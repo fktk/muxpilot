@@ -100,11 +100,11 @@ class MuxpilotApp(App[str | None]):
     def __init__(self, config_path: pathlib.Path | None = None) -> None:
         super().__init__()
         self._client = TmuxClient()
-        self._watcher_instance = TmuxWatcher(self._client)
+        self._watcher = TmuxWatcher(self._client)
         self._current_pane_id: str | None = None
         self._navigate_to: str | None = None
-        self._notify_channel_instance = NotifyChannel()
-        self._label_store_instance = LabelStore(config_path=config_path)
+        self._notify_channel = NotifyChannel()
+        self._label_store = LabelStore(config_path=config_path)
         self._notify_config_error()
 
         self._filter_state = FilterState()
@@ -112,51 +112,12 @@ class MuxpilotApp(App[str | None]):
         self._ui = UIOrchestrator(self)
         self._actions = ActionHandler(self)
         self._polling = TimerCoordinator(
-            watcher=self._watcher_instance,
+            watcher=self._watcher,
             on_tick=self._ui.handle_poll_result,
-            notify_channel=self._notify_channel_instance,
+            notify_channel=self._notify_channel,
             set_interval=self.set_interval,
         )
-        self.theme = self._label_store_instance.get_theme()
-
-    # --- managed properties that recreate controllers on change ---
-    @property
-    def _watcher(self):
-        return self._watcher_instance
-
-    @_watcher.setter
-    def _watcher(self, value: TmuxWatcher) -> None:
-        self._watcher_instance = value
-        if hasattr(self, "_polling"):
-            self._polling = TimerCoordinator(
-                watcher=value,
-                on_tick=self._ui.handle_poll_result,
-                notify_channel=self._notify_channel_instance,
-                set_interval=self.set_interval,
-            )
-
-    @property
-    def _notify_channel(self):
-        return self._notify_channel_instance
-
-    @_notify_channel.setter
-    def _notify_channel(self, value: NotifyChannel) -> None:
-        self._notify_channel_instance = value
-        if hasattr(self, "_polling"):
-            self._polling = TimerCoordinator(
-                watcher=self._watcher_instance,
-                on_tick=self._ui.handle_poll_result,
-                notify_channel=value,
-                set_interval=self.set_interval,
-            )
-
-    @property
-    def _label_store(self):
-        return self._label_store_instance
-
-    @_label_store.setter
-    def _label_store(self, value: LabelStore) -> None:
-        self._label_store_instance = value
+        self.theme = self._label_store.get_theme()
 
 
 
@@ -199,7 +160,7 @@ class MuxpilotApp(App[str | None]):
 
         # Apply tree panel max-width from config
         tree_panel = self.query_one("#tree-panel", Vertical)
-        tree_panel.styles.max_width = self._label_store_instance.get_tree_panel_max_width()
+        tree_panel.styles.max_width = self._label_store.get_tree_panel_max_width()
 
         # Apply initial sidebar visibility based on current terminal size
         await self.on_resize(Resize(self, self.size))
@@ -227,7 +188,7 @@ class MuxpilotApp(App[str | None]):
 
     async def on_resize(self, event: Resize) -> None:
         """Hide or show the detail panel based on terminal width."""
-        threshold = self._label_store_instance.get_sidebar_hide_threshold()
+        threshold = self._label_store.get_sidebar_hide_threshold()
         if threshold <= 0:
             return
         detail = self.query_one("#detail-panel")

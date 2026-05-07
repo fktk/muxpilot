@@ -44,6 +44,7 @@ class TreeParser:
             pane_active = _is_active_str(parts[11])
             width = int(parts[12] or 0)
             height = int(parts[13] or 0)
+            pane_pid = int(parts[14] or 0)
             pane_title = parts[15]
 
             if session_id not in sessions:
@@ -75,6 +76,7 @@ class TreeParser:
                 height=height,
                 is_self=(pane_id == self_pane_id),
                 pane_title=pane_title,
+                pane_pid=pane_pid,
             )
             windows[window_id].panes.append(pane_info)
 

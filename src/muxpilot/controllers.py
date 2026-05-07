@@ -105,5 +105,3 @@ class NodeRenameManager:
         pass
 
 
-# Backward compatibility alias for existing imports
-PaneTitleManager = NodeRenameManager
