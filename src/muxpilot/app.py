@@ -186,6 +186,12 @@ class MuxpilotApp(App[str | None]):
     def action_quit(self) -> None:
         self._actions.action_quit()
 
+    def action_help_quit(self) -> None:
+        """Override Textual's default to show 'q' instead of 'ctrl+q'."""
+        self.notify(
+            "Press [b]q[/b] to quit the app", title="Do you want to quit?"
+        )
+
     async def on_resize(self, event: Resize) -> None:
         """Hide or show the detail panel based on terminal width."""
         threshold = self._label_store.get_sidebar_hide_threshold()
