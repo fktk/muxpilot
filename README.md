@@ -11,7 +11,7 @@ It is designed specifically for **AI agent orchestration** and managing tasks ru
 
 ## ✨ Features
 
-- **🌲 Hierarchical Tree Display**: Displays the tmux `Session → Window → Pane` structure as a tree. Sessions are marked with `■` and windows with `□`.
+- **🌲 Hierarchical Tree Display**: Displays the tmux `Session → Window → Pane` structure as a tree.
 - **⌨️ Keyboard Navigation**: Vim-like keybindings (`j`/`k`) for quickly moving between panes.
 - **🔍 Filtering**:
   - `/`: Filter by name (session name, command, path, etc.)
@@ -20,15 +20,16 @@ It is designed specifically for **AI agent orchestration** and managing tasks ru
 
   | Icon | Status | Detection Condition |
   |:---:|---|---|
-  | **A** | ACTIVE | Pane output changed since last poll, or no prompt/error/idle detected (command running, log output, etc.) |
-  | **W** | WAITING | Last line matches a prompt pattern (waiting for user input) |
-  | **E** | ERROR | Error pattern (`Traceback`, `Error:`, `FAILED`, etc.) detected in the last 10 lines |
-  | **I** | IDLE | No output change for longer than the configured idle threshold |
+  | 🚶/🏃 | ACTIVE | Pane output changed since last poll, or no prompt/error/idle detected (command running, log output, etc.) |
+  | ✋ | WAITING | Last line matches a prompt pattern (waiting for user input) |
+  | 🚨 | ERROR | Error pattern (`Traceback`, `Error:`, `FAILED`, etc.) detected in the last 10 lines |
+  | 🛌 | IDLE | No output change for longer than the configured idle threshold |
 
-  Status is determined in priority order: **ERROR → WAITING → IDLE → ACTIVE**.
+  Status is determined in priority order: **ERROR → WAITING → IDLE → ACTIVE**.  
+  Additionally, once a pane leaves `ACTIVE`, it keeps its current status until new output arrives (hysteresis).
 
-- **🏷️ Rename Pane**: Rename the selected pane with the `n` key. This updates the pane's native tmux title (visible to other tmux clients as well).
-- **📋 Detail Panel**: Displays detailed information about the selected pane, such as the running command, full command line, current directory, git repo/branch, size, status, idle time, and recent output lines.
+- **🏷️ Rename Node**: Rename the selected session, window, or pane with the `n` key. For panes, this updates the native tmux title (visible to other tmux clients as well).
+- **📋 Detail Panel**: Displays detailed information about the selected pane, such as the running command, full command line, current directory, git repo/branch, status, idle time, and recent output lines.
 
 ## 🚀 Installation & Launch
 
@@ -64,19 +65,25 @@ theme = "textual-dark"  # or "textual-light", "nord", "gruvbox"
 poll_interval = 2.0       # Seconds between polls
 idle_threshold = 10.0     # Seconds of no output before a pane is considered idle
 prompt_patterns = [
-    '[$#>%]\\s*$',
+    '[$>?]\\s*$',
     'In \\[\\d+\\]: ',
+    '(?i)\\(y/n\\)',
 ]
 error_patterns = [
     '(?i)Error|Exception|Traceback|FAILED|panic|Segmentation fault|FATAL',
 ]
 
 [ui]
-tree_panel_max_width = 60  # Maximum width of the tree panel in characters
+tree_panel_max_width = 60    # Maximum width of the tree panel in characters
+sidebar_hide_threshold = 80  # Hide detail panel when terminal is at or below this width
 
 [notifications]
 poll_errors = true                     # Show toast when tmux polling fails
+notification_cooldown = 5.0            # Seconds to keep WAITING status after FIFO trigger
 waiting_trigger_pattern = "WAITING"    # Regex that triggers WAITING status via FIFO
+
+[logging]
+level = "INFO"  # DEBUG, INFO, WARNING, or ERROR for ~/.config/muxpilot/muxpilot.log
 ```
 
 - `prompt_patterns`: Regex list for detecting prompts.
@@ -84,8 +91,11 @@ waiting_trigger_pattern = "WAITING"    # Regex that triggers WAITING status via 
 - `poll_interval`: How often to poll tmux for updates.
 - `idle_threshold`: How long a pane must be silent before it becomes `IDLE`.
 - `tree_panel_max_width`: Caps the width of the left tree panel.
+- `sidebar_hide_threshold`: Hides the detail panel when the terminal width is at or below this value. Set to `0` to disable.
 - `poll_errors`: Set to `false` to suppress "tmux poll failed" toast messages.
+- `notification_cooldown`: How long to preserve a notification-triggered `WAITING` status before allowing content changes to clear it.
 - `waiting_trigger_pattern`: When an external FIFO message contains both a pane id (e.g. `%1`) and a match for this pattern, that pane is forced to `WAITING` status.
+- `level`: Log level for the muxpilot log file (`~/.config/muxpilot/muxpilot.log`).
 
 See `config.example.toml` for more details.
 
@@ -98,7 +108,7 @@ See `config.example.toml` for more details.
 | `Enter` | Jump to selected pane (muxpilot continues running in the background) |
 | `/` | Toggle name filter input on/off |
 | `a` | Clear filters and show all |
-| `n` | Rename the selected pane |
+| `n` | Rename the selected node |
 | `x` | Kill the selected pane |
 | `?` | Show help |
 | `q` | Quit |
