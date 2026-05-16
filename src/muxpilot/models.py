@@ -59,6 +59,8 @@ class PaneInfo:
     idle_seconds: float = 0.0
     recent_lines: list[str] = field(default_factory=list)
     pane_pid: int = 0
+    cpu_percent: float | None = None
+    memory_rss_kb: int | None = None
 
     def get_display_label(self, icon_override: str | None = None) -> str:
         """Label for tree view display.

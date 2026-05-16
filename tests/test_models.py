@@ -294,3 +294,18 @@ class TestShortenPath:
         """Home directory itself should become '~'."""
         home = os.path.expanduser("~")
         assert _shorten_path(home) == "~"
+
+
+# ============================================================================
+# PaneInfo resource fields
+# ============================================================================
+
+
+def test_pane_info_resource_fields():
+    pane = make_pane(pane_pid=1234)
+    assert pane.cpu_percent is None
+    assert pane.memory_rss_kb is None
+    pane.cpu_percent = 12.5
+    pane.memory_rss_kb = 256_000
+    assert pane.cpu_percent == 12.5
+    assert pane.memory_rss_kb == 256_000

@@ -102,6 +102,7 @@ class MuxpilotApp(App[str | None]):
         self._client = TmuxClient()
         self._watcher = TmuxWatcher(self._client)
         self._current_pane_id: str | None = None
+        self._selected_pane_id: str | None = None
         self._navigate_to: str | None = None
         self._notify_channel = NotifyChannel()
         self._label_store = LabelStore(config_path=config_path)
@@ -175,6 +176,10 @@ class MuxpilotApp(App[str | None]):
         await self._ui.poll_tmux()
 
     def on_tmux_tree_view_node_info(self, message: TmuxTreeView.NodeInfo) -> None:
+        if message.node_type == "pane" and message.pane_info:
+            self._selected_pane_id = str(message.pane_info.pane_id)
+        else:
+            self._selected_pane_id = None
         self._ui.on_tmux_tree_view_node_info(message)
 
     async def on_tmux_tree_view_pane_activated(self, message: TmuxTreeView.PaneActivated) -> None:

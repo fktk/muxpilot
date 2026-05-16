@@ -231,6 +231,32 @@ async def test_detail_panel_session_does_not_show_counts():
     assert "**Panes:**" not in text
 
 
+@pytest.mark.asyncio
+async def test_detail_panel_shows_resources():
+    """Detail panel should display CPU and memory when available."""
+    panel = DetailPanel()
+    session = make_session(session_name="dev", windows=[
+        make_window(window_name="editor", panes=[
+            make_pane(
+                pane_id="%3",
+                pane_pid=9999,
+                cpu_percent=45.2,
+                memory_rss_kb=512_000,
+            )
+        ])
+    ])
+    window = session.windows[0]
+    pane = window.panes[0]
+    app = _run_detail_panel(panel)
+    async with app.run_test():
+        panel.show_pane(pane, window, session)
+        text = panel._markdown_source
+        assert "CPU:" in text
+        assert "45.2%" in text
+        assert "Memory:" in text
+        assert "500.0 MB" in text  # 512000/1024 = 500.0
+
+
 # ============================================================================
 # Polling: error handling and backoff
 # ============================================================================

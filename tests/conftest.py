@@ -32,6 +32,8 @@ def make_pane(
     idle_seconds: float = 0.0,
     recent_lines: list[str] | None = None,
     pane_pid: int = 0,
+    cpu_percent: float | None = None,
+    memory_rss_kb: int | None = None,
 ) -> PaneInfo:
     """Create a PaneInfo with sensible defaults."""
     return PaneInfo(
@@ -52,6 +54,8 @@ def make_pane(
         idle_seconds=idle_seconds,
         recent_lines=recent_lines or [],
         pane_pid=pane_pid,
+        cpu_percent=cpu_percent,
+        memory_rss_kb=memory_rss_kb,
     )
 
 

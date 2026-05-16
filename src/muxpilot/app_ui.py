@@ -27,7 +27,10 @@ class UIOrchestrator:
     async def do_refresh(self) -> None:
         """Fetch tmux tree and update the UI."""
         try:
-            tree, events = await asyncio.to_thread(self._app._watcher.poll)
+            selected_id = self._app._selected_pane_id
+            tree, events = await asyncio.to_thread(
+                self._app._watcher.poll, selected_id
+            )
         except Exception as e:
             self._app._notify_channel.send(f"Error fetching tmux info: {e}")
             return
@@ -36,6 +39,9 @@ class UIOrchestrator:
 
     async def handle_poll_result(self, tree: TmuxTree, events: list[TmuxEvent]) -> None:
         """Callback passed to TimerCoordinator for each successful poll."""
+        selected_id = self._app._selected_pane_id
+        if selected_id:
+            self._app._watcher.collect_pane_resources(selected_id, tree)
         await self.update_ui_from_poll(tree, events, rebuild_tree=True)
 
     async def poll_tmux(self) -> None:
