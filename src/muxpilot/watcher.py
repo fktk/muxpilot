@@ -16,6 +16,7 @@ from muxpilot.models import (
     TmuxTree,
 )
 from muxpilot.pattern_matcher import PatternMatcher
+from muxpilot.resource_collector import ResourceCollector
 from muxpilot.status_tracker import StatusTracker
 from muxpilot.structural_detector import StructuralChangeDetector
 from muxpilot.tmux_client import TmuxClient
@@ -118,6 +119,7 @@ class TmuxWatcher:
         )
         self._tracker = StatusTracker(preview_lines=preview_lines)
         self._detector = StructuralChangeDetector()
+        self._resource_collector = ResourceCollector()
 
         self._last_tree: TmuxTree | None = None
         self._last_poll_time: float | None = None
@@ -147,7 +149,7 @@ class TmuxWatcher:
         """Replace the activity tracker state (for tests)."""
         self._tracker.activities = value
 
-    def poll(self) -> tuple[TmuxTree, list[TmuxEvent]]:
+    def poll(self, collect_pane_id: str | None = None) -> tuple[TmuxTree, list[TmuxEvent]]:
         """
         Perform one poll cycle:
         1. Fetch the current tmux tree
@@ -223,6 +225,9 @@ class TmuxWatcher:
         current_pane_ids = {p.pane_id for p in new_tree.all_panes()}
         self._tracker.cleanup_removed(current_pane_ids)
 
+        if collect_pane_id:
+            self.collect_pane_resources(collect_pane_id, new_tree)
+
         self._last_tree = new_tree
         self._last_poll_time = now
         logger.debug("poll end events=%d", len(events))
@@ -274,3 +279,16 @@ class TmuxWatcher:
             new_status=PaneStatus.WAITING_INPUT,
             message=f"{pane_id}: {old_status.value} → {PaneStatus.WAITING_INPUT.value}",
         )
+
+    def collect_pane_resources(self, pane_id: str, tree: TmuxTree) -> None:
+        """Collect CPU/memory for the specified pane and store results on its PaneInfo."""
+        for pane in tree.all_panes():
+            if pane.pane_id == pane_id and pane.pane_pid:
+                info = self._resource_collector.get_resources(pane.pane_pid)
+                if info is not None:
+                    pane.cpu_percent = info.cpu_percent
+                    pane.memory_rss_kb = info.memory_rss_kb
+                else:
+                    pane.cpu_percent = None
+                    pane.memory_rss_kb = None
+                break

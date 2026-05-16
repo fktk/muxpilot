@@ -265,3 +265,39 @@ class TestProcessNotification:
         assert "process_notification" in caplog.text
         assert "%0" in caplog.text
         assert "override set" in caplog.text
+
+
+class TestResourceCollection:
+    """Tests for resource collection integration in poll()."""
+
+    def test_poll_collects_resources_for_selected_pane(self):
+        from unittest.mock import MagicMock
+
+        from conftest import make_mock_client, make_pane, make_session, make_tree, make_window
+
+        tree = make_tree(sessions=[make_session(windows=[make_window(panes=[
+            make_pane(pane_id="%1", pane_pid=100),
+            make_pane(pane_id="%2", pane_pid=200),
+        ])])])
+        client = make_mock_client(tree=tree)
+        watcher = TmuxWatcher(client, capture_lines=5)
+
+        # Mock ResourceCollector
+        mock_collector = MagicMock()
+        mock_collector.get_resources.return_value = MagicMock(
+            cpu_percent=23.5, memory_rss_kb=256_000
+        )
+        watcher._resource_collector = mock_collector
+
+        tree, events = watcher.poll(collect_pane_id="%1")
+
+        # Check that the resource was collected for the right pane
+        for pane in tree.all_panes():
+            if pane.pane_id == "%1":
+                assert pane.cpu_percent == 23.5
+                assert pane.memory_rss_kb == 256_000
+            else:
+                assert pane.cpu_percent is None
+                assert pane.memory_rss_kb is None
+
+        mock_collector.get_resources.assert_called_once_with(100)
