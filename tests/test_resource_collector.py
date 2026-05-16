@@ -83,3 +83,22 @@ def test_get_resources_handles_access_denied():
 def test_get_resources_empty_cache_on_first_call():
     collector = ResourceCollector()
     assert collector._cache == {}
+
+
+def test_get_resources_handles_zombie():
+    collector = ResourceCollector()
+    with patch("muxpilot.resource_collector.psutil.Process", side_effect=psutil.ZombieProcess(9999)):
+        result = collector.get_resources(9999)
+        assert result is None
+
+
+def test_get_resources_handles_process_dies_mid_call():
+    collector = ResourceCollector()
+    mock_proc = MagicMock(spec=psutil.Process)
+    mock_proc.pid = 9999
+    mock_proc.cpu_times.return_value = MagicMock(user=1.0, system=0.5)
+    mock_proc.memory_info.side_effect = psutil.NoSuchProcess(9999)
+
+    with patch("muxpilot.resource_collector.psutil.Process", return_value=mock_proc):
+        result = collector.get_resources(9999)
+        assert result is None
