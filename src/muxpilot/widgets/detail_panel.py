@@ -94,10 +94,10 @@ class DetailPanel(Widget):
             f"- **Status:** {status_name.upper()}{idle_text}\n"
         )
 
-        if pane.cpu_percent is not None:
-            mem_mb = pane.memory_rss_kb / 1024 if pane.memory_rss_kb else 0
-            text += f"- **CPU:** {pane.cpu_percent:.1f}%\n"
-            text += f"- **Memory:** {mem_mb:.1f} MB\n"
+        cpu = f"{pane.cpu_percent:.1f}%" if pane.cpu_percent is not None else "—"
+        mem = f"{pane.memory_rss_kb / 1024:.1f} MB" if pane.memory_rss_kb is not None else "—"
+        text += f"- **CPU:** {cpu}\n"
+        text += f"- **Memory:** {mem}\n"
 
         if pane.status == PaneStatus.ERROR:
             text += "\n> **Status is ERROR**\n"
