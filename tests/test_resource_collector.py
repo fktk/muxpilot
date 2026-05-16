@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import psutil
 import pytest
 
-from muxpilot.resource_collector import ResourceCollector, ResourceInfo
+from muxpilot.resource_collector import ResourceCollector
 
 
 def test_get_resources_returns_resource_info():
