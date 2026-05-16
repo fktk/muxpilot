@@ -44,11 +44,15 @@ class ResourceCollector:
 
             child_cpu: float = 0.0
             child_mem: int = 0
-            for child in main.children(recursive=False):
+            try:
+                children = main.children(recursive=False)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
+                children = []
+            for child in children:
                 try:
                     child_cpu += self._calc_cpu(child.pid, child) or 0.0
                     child_mem += child.memory_info().rss
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
                     pass
 
             if main_cpu is None:
@@ -58,7 +62,7 @@ class ResourceCollector:
                 cpu_percent=min(main_cpu + child_cpu, 100.0),
                 memory_rss_kb=(main_mem + child_mem) // 1024,
             )
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError):
             self._cache.pop(main_pid, None)
             return None
 
