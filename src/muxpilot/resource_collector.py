@@ -43,12 +43,12 @@ class ResourceCollector:
 
         child_cpu: float = 0.0
         child_mem: int = 0
-        try:
-            for child in main.children(recursive=False):
+        for child in main.children(recursive=False):
+            try:
                 child_cpu += self._calc_cpu(child.pid, child) or 0.0
                 child_mem += child.memory_info().rss
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
 
         if main_cpu is None:
             return None

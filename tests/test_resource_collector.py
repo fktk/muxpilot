@@ -63,7 +63,7 @@ def test_get_resources_includes_children():
         assert second is not None
         # RSS: 64MB + 32MB = 96MB -> 93750 KB
         assert second.memory_rss_kb == 93750
-        assert 0 <= second.cpu_percent <= 100.0
+        assert second.cpu_percent == pytest.approx(18.0)
 
 
 def test_get_resources_returns_none_on_error():
